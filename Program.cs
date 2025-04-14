@@ -1,10 +1,18 @@
 using Loans.Servicing.Data;
+using Loans.Servicing.Data.Repositories;
+using Loans.Servicing.Kafka;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("Postgres");
 builder.Services.AddDbContext<OperationsDbContext>(options => options.UseNpgsql(connectionString));
+
+builder.Services.AddScoped<IProcessRepository, ProcessRepository>();
+
+
+// Регистрируем Kafka consumer как фоновый сервис
+builder.Services.AddHostedService<KafkaConsumerService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
