@@ -1,6 +1,6 @@
-﻿namespace Loans.Servicing.Data.Dto;
+﻿namespace Loans.Servicing.Kafka.InternalEvents;
 
-public class LoanApplicationRequest
+public record LoanApplicationSubmittedEvent : EventBase
 {
     public Guid ApplicationId { get; init; }
     public Guid ClientId { get; init; }
