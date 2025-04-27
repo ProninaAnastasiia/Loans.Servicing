@@ -25,6 +25,4 @@ public class LoanApplicationRequest
     public string PaymentType { get; set; }
 
     public decimal? InitialPaymentAmount { get; set; }
-    
-    public string OperationId { get; set; }
 }
