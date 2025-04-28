@@ -44,8 +44,7 @@ app.UseHttpsRedirection();
 
 app.MapPost("/api/create-contract", async ([FromBody] LoanApplicationRequest application, KafkaProducerService producer, IConfiguration config, IMapper mapper, IOperationRepository repository) =>
 {
-    //Guid operationId = Guid.NewGuid();
-    Guid operationId = new Guid();
+    Guid operationId = Guid.NewGuid();
     var operation = new OperationEntity
     {
         OperationId = operationId,

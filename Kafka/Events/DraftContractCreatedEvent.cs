@@ -1,7 +1,7 @@
 ﻿namespace Loans.Servicing.Kafka.Events;
 
 public record DraftContractCreatedEvent(
-    string ContractId, string ApplicationId, string ClientId, string DecisionId, DateTime LodgementDate,
-    string CreditProductId, decimal LoanAmount, int LoanTermMonths,
+    Guid ContractId, Guid ApplicationId, Guid ClientId, Guid DecisionId, DateTime LodgementDate,
+    Guid CreditProductId, decimal LoanAmount, int LoanTermMonths,
     decimal InterestRate, string LoanPurpose, string LoanType, string PaymentType,
-    decimal? InitialPaymentAmount, string OperationId) : EventBase;
+    decimal? InitialPaymentAmount, Guid OperationId) : EventBase;
