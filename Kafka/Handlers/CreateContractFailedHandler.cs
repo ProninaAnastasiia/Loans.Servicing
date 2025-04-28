@@ -8,7 +8,7 @@ using Newtonsoft.Json;
 
 namespace Loans.Servicing.Kafka.Handlers;
 
-public class CreateContractFailedHandler: IEventHandler<CreateContractFailedEvent>
+public class CreateContractFailedHandler : IEventHandler<CreateContractFailedEvent>
 {
     private readonly IOperationRepository _operationRepository;
     private readonly ILogger<CreateContractFailedHandler> _logger;

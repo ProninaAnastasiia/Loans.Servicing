@@ -22,11 +22,16 @@ builder.Services.AddAutoMapper(typeof(MappingProfile));
 
 builder.Services.AddScoped<IOperationRepository, OperationRepository>();
 
-builder.Services.AddHostedService<CreateContractConsumer>();
-builder.Services.AddSingleton<KafkaProducerService>();
-
 builder.Services.AddScoped<IEventHandler<DraftContractCreatedEvent>, DraftContractCreatedHandler>();
 builder.Services.AddScoped<IEventHandler<CreateContractFailedEvent>, CreateContractFailedHandler>();
+builder.Services.AddScoped<IEventHandler<RepaymentScheduleCalculatedEvent>, RepaymentScheduleCalculatedHandler>();
+
+builder.Services.AddHostedService<CalculateRepaymentConsumer>();
+builder.Services.AddHostedService<CreateContractConsumer>();
+builder.Services.AddHostedService<UpdateContractConsumer>();
+
+builder.Services.AddSingleton<KafkaProducerService>();
+
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -53,7 +58,7 @@ app.MapPost("/api/create-contract", async ([FromBody] LoanApplicationRequest app
         ContextJson = JsonConvert.SerializeObject(application),
         StartedAt = DateTime.UtcNow
     };
-    repository.SaveAsync(operation);
+    await repository.SaveAsync(operation);
     var @event = mapper.Map<CreateContractRequestedEvent>(application, opt => opt.Items["OperationId"] = operationId);
     var jsonMessage = JsonConvert.SerializeObject(@event);
     var topic = config["Kafka:Topics:CreateContractRequested"];
