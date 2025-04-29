@@ -26,12 +26,12 @@ public class CreateContractConsumer: BackgroundService
         var consumerConfig = new ConsumerConfig
         {
             BootstrapServers = _configuration["Kafka:BootstrapServers"],
-            GroupId = "contract-service-group",
+            GroupId = "orchestrator-service-group",
             AutoOffsetReset = AutoOffsetReset.Earliest
         };
 
         using var consumer = new ConsumerBuilder<Ignore, string>(consumerConfig).Build();
-        consumer.Subscribe(_configuration["Kafka:Topics:CreateContractResult"]);
+        consumer.Subscribe(_configuration["Kafka:Topics:CreateContractRequested"]);
 
         _logger.LogInformation("KafkaConsumerService CreateContractConsumer запущен.");
         

@@ -24,12 +24,12 @@ public class CalculateRepaymentConsumer : BackgroundService
         var consumerConfig = new ConsumerConfig
         {
             BootstrapServers = _configuration["Kafka:BootstrapServers"],
-            GroupId = "contract-service-group",
+            GroupId = "orchestrator-service-group",
             AutoOffsetReset = AutoOffsetReset.Earliest
         };
 
         using var consumer = new ConsumerBuilder<Ignore, string>(consumerConfig).Build();
-        consumer.Subscribe(_configuration["Kafka:Topics:CalculateScheduleResult"]);
+        consumer.Subscribe(_configuration["Kafka:Topics:CalculateRepaymentSchedule"]);
 
         _logger.LogInformation("KafkaConsumerService CalculateRepaymentConsumer запущен.");
         
