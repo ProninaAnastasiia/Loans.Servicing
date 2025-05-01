@@ -22,11 +22,15 @@ public class MappingProfile : Profile
             .ForCtorParam("PaymentType", opt => opt.MapFrom(src => src.PaymentType))
             .ForCtorParam("InitialPaymentAmount", opt => opt.MapFrom(src => src.InitialPaymentAmount))
             .ForCtorParam("OperationId", opt => opt.MapFrom(src => src.OperationId));
-
-        CreateMap<RepaymentScheduleCalculatedEvent, ContractScheduleUpdatedEvent>()
+ 
+        CreateMap<DraftContractCreatedEvent, CalculateContractValuesEvent>()
             .ForCtorParam("ContractId", opt => opt.MapFrom(src => src.ContractId))
-            .ForCtorParam("ScheduleId", opt => opt.MapFrom(src => src.ScheduleId))
+            .ForCtorParam("LoanAmount", opt => opt.MapFrom(src => src.LoanAmount))
+            .ForCtorParam("LoanTermMonths", opt => opt.MapFrom(src => src.LoanTermMonths))
+            .ForCtorParam("InterestRate", opt => opt.MapFrom(src => src.InterestRate))
+            .ForCtorParam("PaymentType", opt => opt.MapFrom(src => src.PaymentType))
             .ForCtorParam("OperationId", opt => opt.MapFrom(src => src.OperationId));
+
 
     }
 

@@ -49,9 +49,10 @@ public class UpdateContractConsumer : BackgroundService
                     var @event = jsonObject.ToObject<ContractScheduleUpdatedEvent>();
                     if (@event != null) await ProcessUpdateContractScheduleEventAsync(@event, stoppingToken);
                 }
-                else
+                if (jsonObject.Property("EventType").Value.ToString().Contains("ContractValuesUpdatedEvent"))
                 {
-                    _logger.LogWarning("Неизвестный тип события: {Json}", result.Message.Value);
+                    var @event = jsonObject.ToObject<ContractValuesUpdatedEvent>();
+                    if (@event != null) await ProcessContractValuesUpdatedEventAsync(@event, stoppingToken);
                 }
             }
         }
@@ -70,14 +71,24 @@ public class UpdateContractConsumer : BackgroundService
     {
         try
         {
-            /*using var scope = _serviceProvider.CreateScope();
-            var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<UpdateContractScheduleEvent>>();
-            await handler.HandleAsync(@event, cancellationToken);*/
-            _logger.LogInformation("Сервис ссуд успешно обновил ScheduleId");
+            _logger.LogInformation("Сервис ссуд успешно обновил ScheduleId.");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Ошибка при обработке события RepaymentScheduleCalculatedEvent: {EventId}, {OperationId}", updatedEvent.EventId, updatedEvent.OperationId);
+            // Тут можно реализовать retry или логирование в dead-letter-topic
+        }
+    }
+    
+    private async Task ProcessContractValuesUpdatedEventAsync(ContractValuesUpdatedEvent updatedEvent, CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogInformation("Сервис ссуд успешно обновил MonthlyPaymentAmount, TotalPaymentAmount, TotalInterestPaid и FullLoanValue.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при обработке события ContractValuesUpdatedEvent: {EventId}, {OperationId}", updatedEvent.EventId, updatedEvent.OperationId);
             // Тут можно реализовать retry или логирование в dead-letter-topic
         }
     }

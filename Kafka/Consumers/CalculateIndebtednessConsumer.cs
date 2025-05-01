@@ -5,13 +5,13 @@ using Newtonsoft.Json.Linq;
 
 namespace Loans.Servicing.Kafka.Consumers;
 
-public class CalculateRepaymentConsumer : BackgroundService
+public class CalculateIndebtednessConsumer : BackgroundService
 {
     private readonly IConfiguration _configuration;
-    private readonly ILogger<CalculateRepaymentConsumer> _logger;
+    private readonly ILogger<CalculateIndebtednessConsumer> _logger;
     private readonly IServiceProvider _serviceProvider;
 
-    public CalculateRepaymentConsumer(IConfiguration configuration, IServiceProvider serviceProvider, ILogger<CalculateRepaymentConsumer> logger)
+    public CalculateIndebtednessConsumer(IConfiguration configuration, IServiceProvider serviceProvider, ILogger<CalculateIndebtednessConsumer> logger)
     {
         _configuration = configuration;
         _logger = logger;
@@ -29,9 +29,9 @@ public class CalculateRepaymentConsumer : BackgroundService
         };
 
         using var consumer = new ConsumerBuilder<Ignore, string>(consumerConfig).Build();
-        consumer.Subscribe(_configuration["Kafka:Topics:CalculateRepaymentSchedule"]);
+        consumer.Subscribe(_configuration["Kafka:Topics:CalculateIndebtedness"]);
 
-        _logger.LogInformation("KafkaConsumerService CalculateRepaymentConsumer запущен.");
+        _logger.LogInformation("KafkaConsumerService CalculateIndebtednessConsumer запущен.");
         
         try
         {
@@ -44,11 +44,10 @@ public class CalculateRepaymentConsumer : BackgroundService
 
                 var jsonObject = JObject.Parse(result.Message.Value);
 
-                // Определяем тип события по наличию определенных свойств
-                if (jsonObject.Property("EventType").Value.ToString().Contains("RepaymentScheduleCalculatedEvent"))
+                if (jsonObject.Property("EventType").Value.ToString().Contains("ContractValuesCalculatedEvent"))
                 {
-                    var @event = jsonObject.ToObject<RepaymentScheduleCalculatedEvent>();
-                    if (@event != null) await ProcessRepaymentScheduleCalculatedEventAsync(@event, stoppingToken);
+                    var @event = jsonObject.ToObject<ContractValuesCalculatedEvent>();
+                    if (@event != null) await ProcessContractValuesCalculatedEventAsync(@event, stoppingToken);
                 }
             }
         }
@@ -63,12 +62,12 @@ public class CalculateRepaymentConsumer : BackgroundService
         }
     }
     
-    private async Task ProcessRepaymentScheduleCalculatedEventAsync(RepaymentScheduleCalculatedEvent @event, CancellationToken cancellationToken)
+    private async Task ProcessContractValuesCalculatedEventAsync(ContractValuesCalculatedEvent @event, CancellationToken cancellationToken)
     {
         try
         {
             using var scope = _serviceProvider.CreateScope();
-            var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<RepaymentScheduleCalculatedEvent>>();
+            var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractValuesCalculatedEvent>>();
             await handler.HandleAsync(@event, cancellationToken);
         }
         catch (Exception ex)

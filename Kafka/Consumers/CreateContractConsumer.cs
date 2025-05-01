@@ -57,10 +57,6 @@ public class CreateContractConsumer: BackgroundService
                     var @event = jsonObject.ToObject<CreateContractFailedEvent>();
                     if (@event != null) await ProcessCreateContractFailedEventAsync(@event, stoppingToken);
                 }
-                else
-                {
-                    _logger.LogWarning("Неизвестный тип события: {Json}", result.Message.Value);
-                }
             }
         }
         catch (KafkaException ex)

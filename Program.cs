@@ -25,10 +25,13 @@ builder.Services.AddScoped<IOperationRepository, OperationRepository>();
 builder.Services.AddScoped<IEventHandler<DraftContractCreatedEvent>, DraftContractCreatedHandler>();
 builder.Services.AddScoped<IEventHandler<CreateContractFailedEvent>, CreateContractFailedHandler>();
 builder.Services.AddScoped<IEventHandler<RepaymentScheduleCalculatedEvent>, RepaymentScheduleCalculatedHandler>();
+builder.Services.AddScoped<IEventHandler<FullLoanValueCalculatedEvent>, FullLoanValueCalculatedHandler>();
+builder.Services.AddScoped<IEventHandler<ContractValuesCalculatedEvent>, ContractValuesCalculatedHandler>();
 
 builder.Services.AddHostedService<CalculateRepaymentConsumer>();
 builder.Services.AddHostedService<CreateContractConsumer>();
 builder.Services.AddHostedService<UpdateContractConsumer>();
+builder.Services.AddHostedService<CalculateIndebtednessConsumer>();
 
 builder.Services.AddSingleton<KafkaProducerService>();
 
