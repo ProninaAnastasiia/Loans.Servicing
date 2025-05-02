@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using Loans.Servicing.Data.Repositories;
 using Loans.Servicing.Kafka.Events.CalculateContractValues;
 using Loans.Servicing.Kafka.Handlers;
 using Newtonsoft.Json.Linq;
@@ -72,6 +73,8 @@ public class CalculateContractValuesConsumer : BackgroundService
         try
         {
             using var scope = _serviceProvider.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
+            await repository.SaveAsync(@event, @event.ContractId, @event.OperationId, cancellationToken);
             var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractValuesCalculatedEvent>>();
             await handler.HandleAsync(@event, cancellationToken);
         }
@@ -87,6 +90,8 @@ public class CalculateContractValuesConsumer : BackgroundService
         try
         {
             using var scope = _serviceProvider.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
+            await repository.SaveAsync(@event, @event.ContractId, @event.OperationId, cancellationToken);
             var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractScheduleCalculatedEvent>>();
             await handler.HandleAsync(@event, cancellationToken);
         }
