@@ -3,20 +3,21 @@ using Loans.Servicing.Data.Dto;
 using Loans.Servicing.Data.Enums;
 using Loans.Servicing.Data.Models;
 using Loans.Servicing.Data.Repositories;
-using Loans.Servicing.Kafka.Events;
+using Loans.Servicing.Kafka.Events.CreateDraftContract;
 using Newtonsoft.Json;
 
 namespace Loans.Servicing.Kafka.Handlers;
 
 public class CreateContractFailedHandler : IEventHandler<CreateContractFailedEvent>
 {
-    private readonly IOperationRepository _operationRepository;
+    private readonly IConfiguration _config;
     private readonly ILogger<CreateContractFailedHandler> _logger;
     private readonly IMapper _mapper;
-    private readonly IConfiguration _config;
-    private KafkaProducerService _producer;
-    
-    public CreateContractFailedHandler(IOperationRepository operationRepository, ILogger<CreateContractFailedHandler> logger, IMapper mapper,IConfiguration config, KafkaProducerService producer)
+    private readonly IOperationRepository _operationRepository;
+    private readonly KafkaProducerService _producer;
+
+    public CreateContractFailedHandler(IOperationRepository operationRepository,
+        ILogger<CreateContractFailedHandler> logger, IMapper mapper, IConfiguration config, KafkaProducerService producer)
     {
         _operationRepository = operationRepository;
         _logger = logger;
@@ -32,7 +33,7 @@ public class CreateContractFailedHandler : IEventHandler<CreateContractFailedEve
             var operation = await _operationRepository.GetByIdAsync(contractEvent.OperationId);
             await _operationRepository.UpdateStatusAsync(operation, OperationStatus.Failed);
 
-            Guid operationId = Guid.NewGuid();
+            var operationId = Guid.NewGuid();
             var newOperation = new OperationEntity
             {
                 OperationId = operationId,
@@ -50,11 +51,11 @@ public class CreateContractFailedHandler : IEventHandler<CreateContractFailedEve
             var topic = _config["Kafka:Topics:CreateContractRequested"];
     
             await _producer.PublishAsync(topic, jsonMessage);
-            
         }
         catch (Exception e)
         {
-            _logger.LogError("Failed to handle error. OperationId: {request.OperationId}", contractEvent.OperationId);
+            _logger.LogError("Failed to handle CreateContractFailedEvent. OperationId: {OperationId}. Exception: {e}", contractEvent.OperationId, e.Message);
+
         }
     }
 }

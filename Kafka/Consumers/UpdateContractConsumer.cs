@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
-using Loans.Servicing.Kafka.Events;
+using Loans.Servicing.Data.Repositories;
+using Loans.Servicing.Kafka.Events.CalculateContractValues;
 using Newtonsoft.Json.Linq;
 
 namespace Loans.Servicing.Kafka.Consumers;
@@ -9,7 +10,6 @@ public class UpdateContractConsumer : BackgroundService
     private readonly IConfiguration _configuration;
     private readonly ILogger<UpdateContractConsumer> _logger;
     private readonly IServiceProvider _serviceProvider;
-
     public UpdateContractConsumer(IConfiguration configuration, IServiceProvider serviceProvider, ILogger<UpdateContractConsumer> logger)
     {
         _configuration = configuration;
@@ -39,20 +39,19 @@ public class UpdateContractConsumer : BackgroundService
                 var result = consumer.Consume(stoppingToken);
                 if (result == null) continue;
 
-                _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
-
                 var jsonObject = JObject.Parse(result.Message.Value);
 
-                // Определяем тип события по наличию определенных свойств
                 if (jsonObject.Property("EventType").Value.ToString().Contains("ContractScheduleUpdatedEvent"))
                 {
+                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
                     var @event = jsonObject.ToObject<ContractScheduleUpdatedEvent>();
-                    if (@event != null) await ProcessUpdateContractScheduleEventAsync(@event, stoppingToken);
+                    if (@event != null) await ProcessEventAsync(@event, stoppingToken);
                 }
                 if (jsonObject.Property("EventType").Value.ToString().Contains("ContractValuesUpdatedEvent"))
                 {
+                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
                     var @event = jsonObject.ToObject<ContractValuesUpdatedEvent>();
-                    if (@event != null) await ProcessContractValuesUpdatedEventAsync(@event, stoppingToken);
+                    if (@event != null) await ProcessEventAsync(@event, stoppingToken);
                 }
             }
         }
@@ -67,30 +66,50 @@ public class UpdateContractConsumer : BackgroundService
         }
     }
     
-    private async Task ProcessUpdateContractScheduleEventAsync(ContractScheduleUpdatedEvent updatedEvent, CancellationToken cancellationToken)
+    private async Task ProcessEventAsync(EventBase @event, CancellationToken cancellationToken)
     {
+        
+        using var scope = _serviceProvider.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
         try
         {
-            _logger.LogInformation("Сервис ссуд успешно обновил ScheduleId.");
+            Guid contractId;
+            Guid operationId;
+            switch (@event)
+            {
+                case ContractValuesUpdatedEvent valuesEvent:
+                    contractId = valuesEvent.ContractId;
+                    operationId = valuesEvent.OperationId;
+                    break;
+
+                case ContractScheduleUpdatedEvent scheduleEvent:
+                    contractId = scheduleEvent.ContractId;
+                    operationId = scheduleEvent.OperationId;
+                    break;
+
+                default:
+                    _logger.LogError("Неподдерживаемый тип события: {Type}", @event.GetType().FullName);
+                    return;
+            }
+            
+            await repository.SaveAsync(@event, contractId, operationId, cancellationToken);
+
+            // Получаем все события для этого контракта и операции
+            var events = await repository.GetEventsAsync(contractId, operationId, cancellationToken);
+
+            // Проверяем, есть ли оба типа событий
+            var valuesEventCheck = events.OfType<ContractValuesUpdatedEvent>().FirstOrDefault();
+            var scheduleEventCheck = events.OfType<ContractScheduleUpdatedEvent>().FirstOrDefault();
+
+            if (valuesEventCheck != null && scheduleEventCheck != null)
+            {
+                // Договор готов к подписанию. Надо завести задачу в плане операций, чтобы отправить договор клиенту
+                _logger.LogInformation("Договор готов к подписанию. Надо завести задачу в плане операций, чтобы отправить договор клиенту.");
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка при обработке события RepaymentScheduleCalculatedEvent: {EventId}, {OperationId}", updatedEvent.EventId, updatedEvent.OperationId);
-            // Тут можно реализовать retry или логирование в dead-letter-topic
+            _logger.LogError(ex, "Ошибка при обработке события: {EventId}, {EventType}", @event.EventId, @event.EventType);
         }
     }
-    
-    private async Task ProcessContractValuesUpdatedEventAsync(ContractValuesUpdatedEvent updatedEvent, CancellationToken cancellationToken)
-    {
-        try
-        {
-            _logger.LogInformation("Сервис ссуд успешно обновил MonthlyPaymentAmount, TotalPaymentAmount, TotalInterestPaid и FullLoanValue.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка при обработке события ContractValuesUpdatedEvent: {EventId}, {OperationId}", updatedEvent.EventId, updatedEvent.OperationId);
-            // Тут можно реализовать retry или логирование в dead-letter-topic
-        }
-    }
-    
 }

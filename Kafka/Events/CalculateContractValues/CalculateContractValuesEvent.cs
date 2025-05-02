@@ -1,4 +1,4 @@
-﻿namespace Loans.Servicing.Kafka.Events;
+﻿namespace Loans.Servicing.Kafka.Events.CalculateContractValues;
 
 public record CalculateContractValuesEvent(
     Guid ContractId, decimal LoanAmount, int LoanTermMonths, decimal InterestRate,

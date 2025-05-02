@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using Loans.Servicing.Data.Dto;
-using Loans.Servicing.Kafka.Events;
+using Loans.Servicing.Kafka.Events.CalculateContractValues;
+using Loans.Servicing.Kafka.Events.CreateDraftContract;
 
 namespace Loans.Servicing.Data.Mappers;
 
@@ -12,17 +13,7 @@ public class MappingProfile : Profile
             .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveOperationId));
         CreateMap<LoanApplicationRequest, CreateContractRequestedEvent>()
             .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveOperationId));
-        
-        CreateMap<DraftContractCreatedEvent, CalculateRepaymentScheduleEvent>()
-            .ForCtorParam("ContractId", opt => opt.MapFrom(src => src.ContractId))
-            .ForCtorParam("LodgementDate", opt => opt.MapFrom(src => src.LodgementDate))
-            .ForCtorParam("LoanAmount", opt => opt.MapFrom(src => src.LoanAmount))
-            .ForCtorParam("LoanTermMonths", opt => opt.MapFrom(src => src.LoanTermMonths))
-            .ForCtorParam("InterestRate", opt => opt.MapFrom(src => src.InterestRate))
-            .ForCtorParam("PaymentType", opt => opt.MapFrom(src => src.PaymentType))
-            .ForCtorParam("InitialPaymentAmount", opt => opt.MapFrom(src => src.InitialPaymentAmount))
-            .ForCtorParam("OperationId", opt => opt.MapFrom(src => src.OperationId));
- 
+
         CreateMap<DraftContractCreatedEvent, CalculateContractValuesEvent>()
             .ForCtorParam("ContractId", opt => opt.MapFrom(src => src.ContractId))
             .ForCtorParam("LoanAmount", opt => opt.MapFrom(src => src.LoanAmount))
@@ -30,8 +21,6 @@ public class MappingProfile : Profile
             .ForCtorParam("InterestRate", opt => opt.MapFrom(src => src.InterestRate))
             .ForCtorParam("PaymentType", opt => opt.MapFrom(src => src.PaymentType))
             .ForCtorParam("OperationId", opt => opt.MapFrom(src => src.OperationId));
-
-
     }
 
     private Guid ResolveOperationId(LoanApplicationRequest src, ResolutionContext context)

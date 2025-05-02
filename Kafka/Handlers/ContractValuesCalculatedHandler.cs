@@ -1,14 +1,14 @@
-﻿using Loans.Servicing.Kafka.Events;
+﻿using Loans.Servicing.Kafka.Events.CalculateContractValues;
 using Newtonsoft.Json;
 
 namespace Loans.Servicing.Kafka.Handlers;
 
 public class ContractValuesCalculatedHandler : IEventHandler<ContractValuesCalculatedEvent>
 {
-    private readonly ILogger<ContractValuesCalculatedHandler> _logger;
     private readonly IConfiguration _config;
-    private KafkaProducerService _producer;
-    
+    private readonly ILogger<ContractValuesCalculatedHandler> _logger;
+    private readonly KafkaProducerService _producer;
+
     public ContractValuesCalculatedHandler(ILogger<ContractValuesCalculatedHandler> logger, IConfiguration config, KafkaProducerService producer)
     {
         _logger = logger;
@@ -27,7 +27,7 @@ public class ContractValuesCalculatedHandler : IEventHandler<ContractValuesCalcu
         }
         catch (Exception e)
         {
-            _logger.LogError("Failed to handle ContractValuesCalculatedEvent. OperationId: {OperationId}. Exception: {e}", @event.OperationId, e.Message);
+            _logger.LogError("Failed to handle ContractValuesCalculatedEvent. ContractId: {ContractId}, OperationId: {OperationId}. Exception: {e}", @event.ContractId , @event.OperationId, e.Message);
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using Loans.Servicing.Kafka.Events;
+using Loans.Servicing.Kafka.Events.CreateDraftContract;
 using Loans.Servicing.Saga.Commands;
 using Loans.Servicing.Saga.State;
 using MassTransit;

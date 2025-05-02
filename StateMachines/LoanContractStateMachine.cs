@@ -1,4 +1,5 @@
 using Loans.Servicing.Kafka.Events;
+using Loans.Servicing.StateMachines.Messages;
 using MassTransit;
 
 namespace Loans.Servicing.StateMachines;
@@ -9,7 +10,7 @@ public class LoanContractStateMachine : MassTransitStateMachine<LoanContractStat
     {
         InstanceState(x => x.CurrentState, Created);
 
-        Event(() => CreateContractRequestedEvent, x => x.CorrelateById(context => context.Message.ApplicationId));
+        Event(() => CreateContractRequestedEvent, x => x.CorrelateById(context => context.Message.CorrelationId));
 
         Initially(
             When(CreateContractRequestedEvent)

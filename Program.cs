@@ -7,7 +7,9 @@ using Loans.Servicing.Data.Models;
 using Loans.Servicing.Data.Repositories;
 using Loans.Servicing.Kafka;
 using Loans.Servicing.Kafka.Consumers;
-using Loans.Servicing.Kafka.Events;
+using Loans.Servicing.Kafka.Events.CalculateContractValues;
+using Loans.Servicing.Kafka.Events.CalculateFullLoanValue;
+using Loans.Servicing.Kafka.Events.CreateDraftContract;
 using Loans.Servicing.Kafka.Handlers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -25,14 +27,13 @@ builder.Services.AddScoped<IEventsRepository, EventsRepository>();
 
 builder.Services.AddScoped<IEventHandler<DraftContractCreatedEvent>, DraftContractCreatedHandler>();
 builder.Services.AddScoped<IEventHandler<CreateContractFailedEvent>, CreateContractFailedHandler>();
-builder.Services.AddScoped<IEventHandler<RepaymentScheduleCalculatedEvent>, RepaymentScheduleCalculatedHandler>();
 builder.Services.AddScoped<IEventHandler<FullLoanValueCalculatedEvent>, FullLoanValueCalculatedHandler>();
 builder.Services.AddScoped<IEventHandler<ContractValuesCalculatedEvent>, ContractValuesCalculatedHandler>();
+builder.Services.AddScoped<IEventHandler<ContractScheduleCalculatedEvent>, ContractScheduleCalculatedHandler>();
 
-builder.Services.AddHostedService<CalculateRepaymentConsumer>();
 builder.Services.AddHostedService<CreateContractConsumer>();
 builder.Services.AddHostedService<UpdateContractConsumer>();
-builder.Services.AddHostedService<CalculateIndebtednessConsumer>();
+builder.Services.AddHostedService<CalculateContractValuesConsumer>();
 
 builder.Services.AddSingleton<KafkaProducerService>();
 

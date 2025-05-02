@@ -1,14 +1,14 @@
-﻿using Loans.Servicing.Kafka.Events;
+﻿using Loans.Servicing.Kafka.Events.CalculateFullLoanValue;
 using Newtonsoft.Json;
 
 namespace Loans.Servicing.Kafka.Handlers;
 
 public class FullLoanValueCalculatedHandler : IEventHandler<FullLoanValueCalculatedEvent>
 {
-    private readonly ILogger<FullLoanValueCalculatedHandler> _logger;
     private readonly IConfiguration _config;
-    private KafkaProducerService _producer;
-    
+    private readonly ILogger<FullLoanValueCalculatedHandler> _logger;
+    private readonly KafkaProducerService _producer;
+
     public FullLoanValueCalculatedHandler(ILogger<FullLoanValueCalculatedHandler> logger, IConfiguration config, KafkaProducerService producer)
     {
         _logger = logger;
@@ -20,7 +20,6 @@ public class FullLoanValueCalculatedHandler : IEventHandler<FullLoanValueCalcula
     {
         try
         {
-            //TODO: Переделать это на общее событие для расчета необходимых для договора полей
             var jsonMessage = JsonConvert.SerializeObject(@event);
             var topic = _config["Kafka:Topics:UpdateContractRequested"];
 
@@ -28,7 +27,7 @@ public class FullLoanValueCalculatedHandler : IEventHandler<FullLoanValueCalcula
         }
         catch (Exception e)
         {
-            _logger.LogError("Failed to handle DraftContractCreatedEvent. OperationId: {OperationId}. Exception: {e}", @event.OperationId, e.Message);
+            _logger.LogError("Failed to handle FullLoanValueCalculatedEvent. OperationId: {OperationId}. Exception: {e}", @event.OperationId, e.Message);
         }
     }
 }

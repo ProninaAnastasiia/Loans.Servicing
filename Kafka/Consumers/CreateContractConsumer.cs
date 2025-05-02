@@ -1,13 +1,11 @@
-﻿using System.Threading.Channels;
-using Confluent.Kafka;
-using Loans.Servicing.Kafka.Events;
+﻿using Confluent.Kafka;
+using Loans.Servicing.Kafka.Events.CreateDraftContract;
 using Loans.Servicing.Kafka.Handlers;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Loans.Servicing.Kafka.Consumers;
 
-public class CreateContractConsumer: BackgroundService
+public class CreateContractConsumer : BackgroundService
 {
     private readonly IConfiguration _configuration;
     private readonly ILogger<CreateContractConsumer> _logger;
@@ -42,18 +40,18 @@ public class CreateContractConsumer: BackgroundService
                 var result = consumer.Consume(stoppingToken);
                 if (result == null) continue;
 
-                _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
-
                 var jsonObject = JObject.Parse(result.Message.Value);
 
                 // Определяем тип события по наличию определенных свойств
                 if (jsonObject.Property("EventType").Value.ToString().Contains("DraftContractCreatedEvent"))
                 {
+                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
                     var @event = jsonObject.ToObject<DraftContractCreatedEvent>();
                     if (@event != null) await ProcessDraftContractCreatedEventAsync(@event, stoppingToken);
                 }
                 else if (jsonObject.Property("EventType").Value.ToString().Contains("CreateContractFailedEvent"))
                 {
+                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
                     var @event = jsonObject.ToObject<CreateContractFailedEvent>();
                     if (@event != null) await ProcessCreateContractFailedEventAsync(@event, stoppingToken);
                 }
@@ -99,6 +97,4 @@ public class CreateContractConsumer: BackgroundService
             // Тут можно реализовать retry или логирование в dead-letter-topic
         }
     }
-
-    
 }
