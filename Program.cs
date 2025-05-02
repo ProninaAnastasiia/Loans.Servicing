@@ -21,6 +21,7 @@ builder.Services.AddDbContext<OperationsDbContext>(options => options.UseNpgsql(
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 
 builder.Services.AddScoped<IOperationRepository, OperationRepository>();
+builder.Services.AddScoped<IEventsRepository, EventsRepository>();
 
 builder.Services.AddScoped<IEventHandler<DraftContractCreatedEvent>, DraftContractCreatedHandler>();
 builder.Services.AddScoped<IEventHandler<CreateContractFailedEvent>, CreateContractFailedHandler>();
@@ -50,9 +51,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapPost("/api/create-contract", async ([FromBody] LoanApplicationRequest application, KafkaProducerService producer, IConfiguration config, IMapper mapper, IOperationRepository repository) =>
+app.MapPost("/api/create-contract", async ([FromBody] LoanApplicationRequest application, KafkaProducerService producer,
+    IConfiguration config, IMapper mapper, IOperationRepository repository, IEventsRepository eventsRepository, CancellationToken cancellationToken) =>
 {
-    Guid operationId = Guid.NewGuid();
+    var operationId = Guid.NewGuid();
     var operation = new OperationEntity
     {
         OperationId = operationId,
@@ -67,6 +69,8 @@ app.MapPost("/api/create-contract", async ([FromBody] LoanApplicationRequest app
     var topic = config["Kafka:Topics:CreateContractRequested"];
     
     await producer.PublishAsync(topic, jsonMessage);
+    
+    await eventsRepository.SaveAsync(@event, operationId, @event.OperationId, cancellationToken);
 });
 
 
