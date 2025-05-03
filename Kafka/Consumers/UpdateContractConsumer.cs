@@ -1,6 +1,10 @@
 ﻿using Confluent.Kafka;
 using Loans.Servicing.Data.Repositories;
 using Loans.Servicing.Kafka.Events.CalculateContractValues;
+using Loans.Servicing.Kafka.Events.GetContractApproved;
+using Loans.Servicing.Kafka.Handlers;
+using Loans.Servicing.Services;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Loans.Servicing.Kafka.Consumers;
@@ -53,6 +57,12 @@ public class UpdateContractConsumer : BackgroundService
                     var @event = jsonObject.ToObject<ContractValuesUpdatedEvent>();
                     if (@event != null) await ProcessEventAsync(@event, stoppingToken);
                 }
+                if (jsonObject.Property("EventType").Value.ToString().Contains("ContractStatusUpdatedEvent"))
+                {
+                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
+                    var @event = jsonObject.ToObject<ContractStatusUpdatedEvent>();
+                    if (@event != null) await ProcessContractStatusUpdatedEventAsync(@event, stoppingToken);
+                }
             }
         }
         catch (KafkaException ex)
@@ -66,11 +76,30 @@ public class UpdateContractConsumer : BackgroundService
         }
     }
     
+    private async Task ProcessContractStatusUpdatedEventAsync(ContractStatusUpdatedEvent @event, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
+            await repository.SaveAsync(@event, @event.OperationId, @event.OperationId, cancellationToken);
+            /*var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractStatusUpdatedEvent>>();
+            await handler.HandleAsync(@event, cancellationToken);*/
+            _logger.LogInformation("Статус контракта изменен.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при обработке события ContractStatusUpdatedEvent: {EventId}, {OperationId}", @event.EventId, @event.OperationId);
+            // Тут можно реализовать retry или логирование в dead-letter-topic
+        }
+    }
+    
     private async Task ProcessEventAsync(EventBase @event, CancellationToken cancellationToken)
     {
         
         using var scope = _serviceProvider.CreateScope();
         var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
+        var taskScheduler = scope.ServiceProvider.GetRequiredService<IDelayedTaskScheduler>();
         try
         {
             Guid contractId;
@@ -104,7 +133,8 @@ public class UpdateContractConsumer : BackgroundService
             if (valuesEventCheck != null && scheduleEventCheck != null)
             {
                 // Договор готов к подписанию. Надо завести задачу в плане операций, чтобы отправить договор клиенту
-                _logger.LogInformation("Договор готов к подписанию. Надо завести задачу в плане операций, чтобы отправить договор клиенту.");
+                var newEvent = new ContractDetailsRequestedEvent(contractId, operationId);
+                await taskScheduler.ScheduleTaskAsync(newEvent, "update-contract-requested", contractId, operationId, TimeSpan.FromSeconds(5), cancellationToken);
             }
         }
         catch (Exception ex)

@@ -1,4 +1,6 @@
 using AutoMapper;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Loans.Servicing.Data;
 using Loans.Servicing.Data.Dto;
 using Loans.Servicing.Data.Enums;
@@ -10,7 +12,9 @@ using Loans.Servicing.Kafka.Consumers;
 using Loans.Servicing.Kafka.Events.CalculateContractValues;
 using Loans.Servicing.Kafka.Events.CalculateFullLoanValue;
 using Loans.Servicing.Kafka.Events.CreateDraftContract;
+using Loans.Servicing.Kafka.Events.GetContractApproved;
 using Loans.Servicing.Kafka.Handlers;
+using Loans.Servicing.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
@@ -30,6 +34,11 @@ builder.Services.AddScoped<IEventHandler<CreateContractFailedEvent>, CreateContr
 builder.Services.AddScoped<IEventHandler<FullLoanValueCalculatedEvent>, FullLoanValueCalculatedHandler>();
 builder.Services.AddScoped<IEventHandler<ContractValuesCalculatedEvent>, ContractValuesCalculatedHandler>();
 builder.Services.AddScoped<IEventHandler<ContractScheduleCalculatedEvent>, ContractScheduleCalculatedHandler>();
+builder.Services.AddScoped<IEventHandler<ContractDetailsResponseEvent>, ContractDetailsResponseHandler>();
+builder.Services.AddScoped<IEventHandler<ContractSentToClientEvent>, ContractSentToClientHandler>();
+
+builder.Services.AddScoped<IDelayedTaskScheduler, DelayedTaskScheduler>();
+
 
 builder.Services.AddHostedService<CreateContractConsumer>();
 builder.Services.AddHostedService<UpdateContractConsumer>();
@@ -37,6 +46,17 @@ builder.Services.AddHostedService<CalculateContractValuesConsumer>();
 
 builder.Services.AddSingleton<KafkaProducerService>();
 
+builder.Services.AddHangfire(configuration =>
+{
+    configuration
+        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+        .UseSimpleAssemblyNameTypeSerializer()
+        .UseRecommendedSerializerSettings()
+        .UsePostgreSqlStorage(connectionString);
+});
+
+// Регистрируем сервер Hangfire как HostedService
+builder.Services.AddHangfireServer();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -74,5 +94,6 @@ app.MapPost("/api/create-contract", async ([FromBody] LoanApplicationRequest app
     await eventsRepository.SaveAsync(@event, operationId, @event.OperationId, cancellationToken);
 });
 
+app.UseHangfireDashboard("/hangfire");
 
 app.Run();

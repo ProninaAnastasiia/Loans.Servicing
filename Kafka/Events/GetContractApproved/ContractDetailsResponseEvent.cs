@@ -1,0 +1,32 @@
+﻿namespace Loans.Servicing.Kafka.Events.GetContractApproved;
+
+public record ContractDetailsResponseEvent(
+    Guid ContractId,
+    Guid ApplicationId,
+    Guid ClientId,
+    DateTime LodgementDate,
+    Guid DecisionId,
+    string CreditProductId,
+    decimal LoanAmount,
+    int LoanTermMonths,
+    decimal InterestRate,
+    string LoanPurpose,
+    string LoanType,
+    string PaymentType,
+    decimal? InitialPaymentAmount,
+    Guid OperationId,
+    Guid? CloseOperationId,
+    Guid? ActivateOperationId,
+    DateTime? BeginDate,
+    DateTime? CloseDate,
+    string ContractStatus,
+    Guid? CreditIssuanceAccount,
+    Guid? DebitFromAccount,
+    decimal? MonthlyPaymentAmount,
+    decimal? TotalPaymentAmount,
+    decimal? TotalInterestPaid,
+    decimal? FullLoanValue,
+    Guid? PaymentScheduleId,
+    string AdditionalTerms,
+    DateTime LastModificationDate
+) : EventBase;

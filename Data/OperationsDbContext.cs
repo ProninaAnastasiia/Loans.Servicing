@@ -22,5 +22,4 @@ public class OperationsDbContext: DbContext
         
         base.OnModelCreating(modelBuilder);
     }
-
 }

@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using Loans.Servicing.Data.Repositories;
 using Loans.Servicing.Kafka.Events.CreateDraftContract;
+using Loans.Servicing.Kafka.Events.GetContractApproved;
 using Loans.Servicing.Kafka.Handlers;
 using Newtonsoft.Json.Linq;
 
@@ -43,7 +44,6 @@ public class CreateContractConsumer : BackgroundService
 
                 var jsonObject = JObject.Parse(result.Message.Value);
 
-                // Определяем тип события по наличию определенных свойств
                 if (jsonObject.Property("EventType").Value.ToString().Contains("DraftContractCreatedEvent"))
                 {
                     _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
@@ -55,6 +55,18 @@ public class CreateContractConsumer : BackgroundService
                     _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
                     var @event = jsonObject.ToObject<CreateContractFailedEvent>();
                     if (@event != null) await ProcessCreateContractFailedEventAsync(@event, stoppingToken);
+                }
+                else if (jsonObject.Property("EventType").Value.ToString().Contains("ContractDetailsResponseEvent"))
+                {
+                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
+                    var @event = jsonObject.ToObject<ContractDetailsResponseEvent>();
+                    if (@event != null) await ProcessContractDetailsResponseEventAsync(@event, stoppingToken);
+                }
+                else if (jsonObject.Property("EventType").Value.ToString().Contains("ContractSentToClientEvent"))
+                {
+                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
+                    var @event = jsonObject.ToObject<ContractSentToClientEvent>();
+                    if (@event != null) await ProcessContractSentToClientEventAsync(@event, stoppingToken);
                 }
             }
         }
@@ -81,7 +93,7 @@ public class CreateContractConsumer : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка при обработке события: {EventId}, {OperationId}", @event.EventId, @event.OperationId);
+            _logger.LogError(ex, "Ошибка при обработке события DraftContractCreatedEvent: {EventId}, {OperationId}", @event.EventId, @event.OperationId);
             // Тут можно реализовать retry или логирование в dead-letter-topic
         }
     }
@@ -98,7 +110,39 @@ public class CreateContractConsumer : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка при обработке события: {EventId}, {OperationId}", @event.EventId, @event.OperationId);
+            _logger.LogError(ex, "Ошибка при обработке события CreateContractFailedEvent: {EventId}, {OperationId}", @event.EventId, @event.OperationId);
+            // Тут можно реализовать retry или логирование в dead-letter-topic
+        }
+    }
+    private async Task ProcessContractDetailsResponseEventAsync(ContractDetailsResponseEvent @event, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
+            await repository.SaveAsync(@event, @event.OperationId, @event.OperationId, cancellationToken);
+            var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractDetailsResponseEvent>>();
+            await handler.HandleAsync(@event, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при обработке события ContractDetailsResponseEvent: {EventId}, {OperationId}", @event.EventId, @event.OperationId);
+            // Тут можно реализовать retry или логирование в dead-letter-topic
+        }
+    }
+    private async Task ProcessContractSentToClientEventAsync(ContractSentToClientEvent @event, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
+            await repository.SaveAsync(@event, @event.OperationId, @event.OperationId, cancellationToken);
+            var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractSentToClientEvent>>();
+            await handler.HandleAsync(@event, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при обработке события ContractSentToClientEvent: {EventId}, {OperationId}", @event.EventId, @event.OperationId);
             // Тут можно реализовать retry или логирование в dead-letter-topic
         }
     }
