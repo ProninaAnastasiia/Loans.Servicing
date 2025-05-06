@@ -1,0 +1,129 @@
+version: '3.8'
+
+services:
+  kafka1:
+    image: apache/kafka:latest
+    hostname: kafka1
+    container_name: kafka1
+    ports:
+      - '9092:9092'
+    networks:
+      - kafka-net
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: CONTROLLER://kafka1:29093,PLAINTEXT://kafka1:19092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:19092,EXTERNAL://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:29093,2@kafka2:29093,3@kafka3:29093
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: XoUwlxwBR9C1sZPVgk1F1w
+
+  kafka2:
+    image: apache/kafka:latest
+    hostname: kafka2
+    container_name: kafka2
+    ports:
+      - '9093:9093'
+    networks:
+      - kafka-net
+    environment:
+      KAFKA_NODE_ID: 2
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: CONTROLLER://kafka2:29093,PLAINTEXT://kafka2:19092,EXTERNAL://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:19092,EXTERNAL://localhost:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:29093,2@kafka2:29093,3@kafka3:29093
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: XoUwlxwBR9C1sZPVgk1F1w
+
+  kafka3:
+    image: apache/kafka:latest
+    hostname: kafka3
+    container_name: kafka3
+    ports:
+      - '9094:9094'
+    networks:
+      - kafka-net
+    environment:
+      KAFKA_NODE_ID: 3
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: CONTROLLER://kafka3:29093,PLAINTEXT://kafka3:19092,EXTERNAL://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka3:19092,EXTERNAL://localhost:9094
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:29093,2@kafka2:29093,3@kafka3:29093
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: XoUwlxwBR9C1sZPVgk1F1w
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:latest
+    container_name: kafka-exporter
+    ports:
+      - '9308:9308'
+    networks:
+      - kafka-net
+    command:
+      - '--kafka.server=kafka1:19092'
+      - '--kafka.server=kafka2:19092'
+      - '--kafka.server=kafka3:19092'
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - kafka-net
+    depends_on:
+      - kafka-exporter
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - '3000:3000'
+    networks:
+      - kafka-net
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: password
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"
+    networks:
+      - kafka-net
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+    environment:
+      DYNAMIC_CONFIG_ENABLED: 'true'
+      KAFKA_CLUSTERS_0_NAME: local-kafka-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka1:19092,kafka2:19092,kafka3:19092
+      KAFKA_CLUSTERS_0_METRICS_PORT: 9997
+
+networks:
+  kafka-net:
+    driver: bridge
+
+volumes:
+  grafana_data:

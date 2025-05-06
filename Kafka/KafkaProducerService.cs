@@ -14,7 +14,10 @@ public class KafkaProducerService
 
         var producerconfig = new ProducerConfig
         {
-            BootstrapServers = _configuration["Kafka:BootstrapServers"]
+            BootstrapServers = _configuration["Kafka:BootstrapServers"],
+            Acks = Acks.All, // гарантирует доставку в реплицированные брокеры
+            MessageTimeoutMs = 5000,
+            EnableIdempotence = true // защита от дублирующей отправки при сбоях
         };
 
         _logger = logger;
