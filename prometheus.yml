@@ -10,3 +10,23 @@ scrape_configs:
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
+
+  - job_name: 'loans-servicing'
+    static_configs:
+      - targets: ['host.docker.internal:5232']
+
+  - job_name: 'loans-schedules'
+    static_configs:
+      - targets: ['host.docker.internal:5264']
+        
+  - job_name: 'loans-contracts'
+    static_configs:
+      - targets: ['host.docker.internal:5182']
+        
+  - job_name: 'loans-indebtedness'
+    static_configs:
+      - targets: ['host.docker.internal:5205']
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']

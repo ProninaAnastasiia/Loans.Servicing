@@ -1,6 +1,7 @@
 using AutoMapper;
 using Hangfire;
 using Hangfire.PostgreSql;
+using Loans.Servicing;
 using Loans.Servicing.Data;
 using Loans.Servicing.Data.Dto;
 using Loans.Servicing.Data.Enums;
@@ -13,11 +14,13 @@ using Loans.Servicing.Kafka.Events.CalculateContractValues;
 using Loans.Servicing.Kafka.Events.CalculateFullLoanValue;
 using Loans.Servicing.Kafka.Events.CreateDraftContract;
 using Loans.Servicing.Kafka.Events.GetContractApproved;
+using Loans.Servicing.Kafka.Events.InnerEvents;
 using Loans.Servicing.Kafka.Handlers;
 using Loans.Servicing.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,6 +33,7 @@ builder.Services.AddScoped<IOperationRepository, OperationRepository>();
 builder.Services.AddScoped<IEventsRepository, EventsRepository>();
 
 builder.Services.AddScoped<IEventHandler<DraftContractCreatedEvent>, DraftContractCreatedHandler>();
+builder.Services.AddScoped<IEventHandler<LoanApplicationRecieved>, LoanApplicationRecievedHandler>();
 builder.Services.AddScoped<IEventHandler<CreateContractFailedEvent>, CreateContractFailedHandler>();
 builder.Services.AddScoped<IEventHandler<FullLoanValueCalculatedEvent>, FullLoanValueCalculatedHandler>();
 builder.Services.AddScoped<IEventHandler<ContractValuesCalculatedEvent>, ContractValuesCalculatedHandler>();
@@ -70,30 +74,24 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
 app.MapPost("/api/create-contract", async ([FromBody] LoanApplicationRequest application, KafkaProducerService producer,
     IConfiguration config, IMapper mapper, IOperationRepository repository, IEventsRepository eventsRepository, CancellationToken cancellationToken) =>
 {
-    var operationId = Guid.NewGuid();
-    var operation = new OperationEntity
-    {
-        OperationId = operationId,
-        Description = "Создание черновика контракта",
-        Status = OperationStatus.Started,
-        ContextJson = JsonConvert.SerializeObject(application),
-        StartedAt = DateTime.UtcNow
-    };
-    await repository.SaveAsync(operation);
-    var @event = mapper.Map<CreateContractRequestedEvent>(application, opt => opt.Items["OperationId"] = operationId);
+    
+    var @event = mapper.Map<LoanApplicationRecieved>(application);
     var jsonMessage = JsonConvert.SerializeObject(@event);
     var topic = config["Kafka:Topics:CreateContractRequested"];
-    
     await producer.PublishAsync(topic, jsonMessage);
-    
-    await eventsRepository.SaveAsync(@event, operationId, @event.OperationId, cancellationToken);
 });
 
 app.UseHangfireDashboard("/hangfire");
+
+// Метрики HTTP
+app.UseHttpMetrics(); 
+
+// Экспонирование метрик на /metrics
+app.MapMetrics();
 
 app.Run();

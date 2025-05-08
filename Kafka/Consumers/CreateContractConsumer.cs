@@ -2,6 +2,7 @@
 using Loans.Servicing.Data.Repositories;
 using Loans.Servicing.Kafka.Events.CreateDraftContract;
 using Loans.Servicing.Kafka.Events.GetContractApproved;
+using Loans.Servicing.Kafka.Events.InnerEvents;
 using Loans.Servicing.Kafka.Handlers;
 using Newtonsoft.Json.Linq;
 
@@ -44,7 +45,13 @@ public class CreateContractConsumer : BackgroundService
 
                 var jsonObject = JObject.Parse(result.Message.Value);
 
-                if (jsonObject.Property("EventType").Value.ToString().Contains("DraftContractCreatedEvent"))
+                if (jsonObject.Property("EventType").Value.ToString().Contains("LoanApplicationRecieved"))
+                {
+                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
+                    var @event = jsonObject.ToObject<LoanApplicationRecieved>();
+                    if (@event != null) await ProcessLoanApplicationRecievedAsync(@event, stoppingToken);
+                }
+                else if (jsonObject.Property("EventType").Value.ToString().Contains("DraftContractCreatedEvent"))
                 {
                     _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
                     var @event = jsonObject.ToObject<DraftContractCreatedEvent>();
@@ -78,6 +85,23 @@ public class CreateContractConsumer : BackgroundService
         finally
         {
             consumer.Close();
+        }
+    }
+    
+    private async Task ProcessLoanApplicationRecievedAsync(LoanApplicationRecieved @event, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
+            await repository.SaveAsync(@event, @event.ClientId, @event.OperationId, cancellationToken);
+            var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<LoanApplicationRecieved>>();
+            await handler.HandleAsync(@event, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при обработке события LoanApplicationRecieved: {EventId}, {OperationId}", @event.EventId, @event.OperationId);
+            // Тут можно реализовать retry или логирование в dead-letter-topic
         }
     }
     

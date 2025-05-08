@@ -86,6 +86,7 @@ public class UpdateContractConsumer : BackgroundService
             /*var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractStatusUpdatedEvent>>();
             await handler.HandleAsync(@event, cancellationToken);*/
             _logger.LogInformation("Статус контракта изменен.");
+            MetricsRegistry.StopTimer(@event.OperationId); // <-- СТОП
         }
         catch (Exception ex)
         {

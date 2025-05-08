@@ -3,6 +3,7 @@ using Loans.Servicing.Data.Dto;
 using Loans.Servicing.Kafka.Events.CalculateContractValues;
 using Loans.Servicing.Kafka.Events.CreateDraftContract;
 using Loans.Servicing.Kafka.Events.GetContractApproved;
+using Loans.Servicing.Kafka.Events.InnerEvents;
 
 namespace Loans.Servicing.Data.Mappers;
 
@@ -14,6 +15,14 @@ public class MappingProfile : Profile
             .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveOperationId));
         CreateMap<LoanApplicationRequest, CreateContractRequestedEvent>()
             .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveOperationId));
+        
+        CreateMap<LoanApplicationRequest, LoanApplicationRecieved>();
+        
+        CreateMap<LoanApplicationRecieved, LoanApplicationRequest>()
+            .ForMember(dest => dest.ApplicationId, opt => opt.MapFrom(src => src.ApplicationId.ToString()))
+            .ForMember(dest => dest.ClientId, opt => opt.MapFrom(src => src.ClientId.ToString()))
+            .ForMember(dest => dest.DecisionId, opt => opt.MapFrom(src => src.DecisionId.ToString()))
+            .ForMember(dest => dest.CreditProductId, opt => opt.MapFrom(src => src.CreditProductId.ToString()));
 
         CreateMap<DraftContractCreatedEvent, CalculateContractValuesEvent>()
             .ForCtorParam("ContractId", opt => opt.MapFrom(src => src.ContractId))
