@@ -1,78 +1,40 @@
-﻿using Confluent.Kafka;
-using Loans.Servicing.Data.Repositories;
+﻿using Loans.Servicing.Data.Repositories;
 using Loans.Servicing.Kafka.Events.CalculateContractValues;
 using Loans.Servicing.Kafka.Events.GetContractApproved;
-using Loans.Servicing.Kafka.Handlers;
 using Loans.Servicing.Services;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Loans.Servicing.Kafka.Consumers;
 
-public class UpdateContractConsumer : BackgroundService
+public class UpdateContractConsumer : KafkaBackgroundConsumer
 {
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<UpdateContractConsumer> _logger;
-    private readonly IServiceProvider _serviceProvider;
-    public UpdateContractConsumer(IConfiguration configuration, IServiceProvider serviceProvider, ILogger<UpdateContractConsumer> logger)
+    public UpdateContractConsumer(
+        IConfiguration config,
+        IServiceProvider serviceProvider,
+        ILogger<UpdateContractConsumer> logger)
+        : base(config, serviceProvider, logger,
+            topic: config["Kafka:Topics:UpdateContractRequested"],
+            groupId: "orchestrator-service-group",
+            consumerName: nameof(UpdateContractConsumer)) { }
+
+    protected override async Task HandleMessageAsync(JObject message, CancellationToken cancellationToken)
     {
-        _configuration = configuration;
-        _logger = logger;
-        _serviceProvider = serviceProvider;
-    }
+        var eventType = message["EventType"]?.ToString();
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        await Task.Delay(3000, stoppingToken); // дать приложению прогрузиться
-        var consumerConfig = new ConsumerConfig
+        if (eventType?.Contains("ContractScheduleUpdatedEvent") == true)
         {
-            BootstrapServers = _configuration["Kafka:BootstrapServers"],
-            GroupId = "orchestrator-service-group",
-            AutoOffsetReset = AutoOffsetReset.Earliest
-        };
-
-        using var consumer = new ConsumerBuilder<Ignore, string>(consumerConfig).Build();
-        consumer.Subscribe(_configuration["Kafka:Topics:UpdateContractRequested"]);
-
-        _logger.LogInformation("KafkaConsumerService UpdateContractConsumer запущен.");
-        
-        try
-        {
-            while (!stoppingToken.IsCancellationRequested)
-            {
-                var result = consumer.Consume(stoppingToken);
-                if (result == null) continue;
-
-                var jsonObject = JObject.Parse(result.Message.Value);
-
-                if (jsonObject.Property("EventType").Value.ToString().Contains("ContractScheduleUpdatedEvent"))
-                {
-                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
-                    var @event = jsonObject.ToObject<ContractScheduleUpdatedEvent>();
-                    if (@event != null) await ProcessEventAsync(@event, stoppingToken);
-                }
-                if (jsonObject.Property("EventType").Value.ToString().Contains("ContractValuesUpdatedEvent"))
-                {
-                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
-                    var @event = jsonObject.ToObject<ContractValuesUpdatedEvent>();
-                    if (@event != null) await ProcessEventAsync(@event, stoppingToken);
-                }
-                if (jsonObject.Property("EventType").Value.ToString().Contains("ContractStatusUpdatedEvent"))
-                {
-                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
-                    var @event = jsonObject.ToObject<ContractStatusUpdatedEvent>();
-                    if (@event != null) await ProcessContractStatusUpdatedEventAsync(@event, stoppingToken);
-                }
-            }
+            var @event = message.ToObject<ContractScheduleUpdatedEvent>();
+            if (@event != null) await ProcessEventAsync(@event, cancellationToken);
         }
-        catch (KafkaException ex)
+        else if (eventType?.Contains("ContractValuesUpdatedEvent") == true)
         {
-            _logger.LogError(ex, "Kafka временно недоступна или ошибка получения сообщения.");
-            await Task.Delay(1000, stoppingToken); // Ждем и пытаемся снова
+            var @event = message.ToObject<ContractValuesUpdatedEvent>();
+            if (@event != null) await ProcessEventAsync(@event, cancellationToken);
         }
-        finally
+        else if (eventType?.Contains("ContractStatusUpdatedEvent") == true)
         {
-            consumer.Close();
+            var @event = message.ToObject<ContractStatusUpdatedEvent>();
+            if (@event != null) await ProcessContractStatusUpdatedEventAsync(@event, cancellationToken);
         }
     }
     
@@ -80,7 +42,7 @@ public class UpdateContractConsumer : BackgroundService
     {
         try
         {
-            using var scope = _serviceProvider.CreateScope();
+            using var scope = ServiceProvider.CreateScope();
             var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
             await repository.SaveAsync(@event, @event.OperationId, @event.OperationId, cancellationToken);
             /*var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractStatusUpdatedEvent>>();
@@ -98,7 +60,7 @@ public class UpdateContractConsumer : BackgroundService
     private async Task ProcessEventAsync(EventBase @event, CancellationToken cancellationToken)
     {
         
-        using var scope = _serviceProvider.CreateScope();
+        using var scope = ServiceProvider.CreateScope();
         var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
         var taskScheduler = scope.ServiceProvider.GetRequiredService<IDelayedTaskScheduler>();
         try
@@ -118,7 +80,6 @@ public class UpdateContractConsumer : BackgroundService
                     break;
 
                 default:
-                    _logger.LogError("Неподдерживаемый тип события: {Type}", @event.GetType().FullName);
                     return;
             }
             

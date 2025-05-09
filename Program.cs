@@ -4,9 +4,7 @@ using Hangfire.PostgreSql;
 using Loans.Servicing;
 using Loans.Servicing.Data;
 using Loans.Servicing.Data.Dto;
-using Loans.Servicing.Data.Enums;
 using Loans.Servicing.Data.Mappers;
-using Loans.Servicing.Data.Models;
 using Loans.Servicing.Data.Repositories;
 using Loans.Servicing.Kafka;
 using Loans.Servicing.Kafka.Consumers;
@@ -76,11 +74,11 @@ if (app.Environment.IsDevelopment())
 
 //app.UseHttpsRedirection();
 
-app.MapPost("/api/create-contract", async ([FromBody] LoanApplicationRequest application, KafkaProducerService producer,
-    IConfiguration config, IMapper mapper, IOperationRepository repository, IEventsRepository eventsRepository, CancellationToken cancellationToken) =>
+app.MapPost("/api/create-contract", async ([FromBody] LoanApplicationRequest application, KafkaProducerService producer, IConfiguration config, IMapper mapper) =>
 {
-    
-    var @event = mapper.Map<LoanApplicationRecieved>(application);
+    var operationId = Guid.NewGuid();
+    MetricsRegistry.StartTimer(operationId);
+    var @event = mapper.Map<LoanApplicationRecieved>(application, opt => opt.Items["OperationId"] = operationId);
     var jsonMessage = JsonConvert.SerializeObject(@event);
     var topic = config["Kafka:Topics:CreateContractRequested"];
     await producer.PublishAsync(topic, jsonMessage);

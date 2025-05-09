@@ -27,4 +27,27 @@ public static class MetricsRegistry
             timer.Dispose();
         }
     }
+    
+    public static readonly Histogram ScheduleCalculationLatency = Metrics
+        .CreateHistogram("schedule_calculation_latency_seconds", "Latency: Loans.Servicing → Loans.Schedules → Loans.Servicing",
+            new HistogramConfiguration
+            {
+                Buckets = Histogram.ExponentialBuckets(start: 0.1, factor: 2, count: 15) // от 100 мс до ~160 сек
+            });
+
+    private static readonly ConcurrentDictionary<Guid, IDisposable> ScheduleLatencyTimers = new();
+
+    public static void StartScheduleLatencyTimer(Guid correlationId)
+    {
+        var timer = ScheduleCalculationLatency.NewTimer();
+        ScheduleLatencyTimers.TryAdd(correlationId, timer);
+    }
+
+    public static void StopScheduleLatencyTimer(Guid correlationId)
+    {
+        if (ScheduleLatencyTimers.TryRemove(correlationId, out var timer))
+        {
+            timer.Dispose();
+        }
+    }
 }

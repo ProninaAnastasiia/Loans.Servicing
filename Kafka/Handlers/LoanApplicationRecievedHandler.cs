@@ -34,24 +34,22 @@ public class LoanApplicationRecievedHandler : IEventHandler<LoanApplicationRecie
         try
         {
             var application = _mapper.Map<LoanApplicationRequest>(applicationEvent);
-            var operationId = Guid.NewGuid();
-            MetricsRegistry.StartTimer(operationId);
             var operation = new OperationEntity
             {
-                OperationId = operationId,
+                OperationId = applicationEvent.OperationId,
                 Description = "Создание черновика контракта",
                 Status = OperationStatus.Started,
                 ContextJson = JsonConvert.SerializeObject(application),
                 StartedAt = DateTime.UtcNow
             };
             await _operationRepository.SaveAsync(operation);
-            var @event = _mapper.Map<CreateContractRequestedEvent>(application, opt => opt.Items["OperationId"] = operationId);
+            var @event = _mapper.Map<CreateContractRequestedEvent>(application, opt => opt.Items["OperationId"] = applicationEvent.OperationId);
             var jsonMessage = JsonConvert.SerializeObject(@event);
             var topic = _config["Kafka:Topics:CreateContractRequested"];
     
             await _producer.PublishAsync(topic, jsonMessage);
     
-            await _eventsRepository.SaveAsync(@event, operationId, @event.OperationId, cancellationToken);
+            await _eventsRepository.SaveAsync(@event, applicationEvent.OperationId, @event.OperationId, cancellationToken);
         }
         catch (Exception e)
         {

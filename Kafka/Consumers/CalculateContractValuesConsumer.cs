@@ -1,78 +1,48 @@
-﻿using Confluent.Kafka;
-using Loans.Servicing.Data.Repositories;
+﻿using Loans.Servicing.Data.Repositories;
 using Loans.Servicing.Kafka.Events.CalculateContractValues;
 using Loans.Servicing.Kafka.Handlers;
 using Newtonsoft.Json.Linq;
 
 namespace Loans.Servicing.Kafka.Consumers;
 
-public class CalculateContractValuesConsumer : BackgroundService
+public class CalculateContractValuesConsumer : KafkaBackgroundConsumer
 {
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<CalculateContractValuesConsumer> _logger;
-    private readonly IServiceProvider _serviceProvider;
-
-    public CalculateContractValuesConsumer(IConfiguration configuration, IServiceProvider serviceProvider, ILogger<CalculateContractValuesConsumer> logger)
+    public CalculateContractValuesConsumer(
+        IConfiguration config,
+        IServiceProvider serviceProvider,
+        ILogger<CalculateContractValuesConsumer> logger)
+        : base(config, serviceProvider, logger,
+            topic: config["Kafka:Topics:CalculateContractValues"],
+            groupId: "orchestrator-service-group",
+            consumerName: nameof(CalculateContractValuesConsumer)) { }
+    
+    protected override async Task HandleMessageAsync(JObject message, CancellationToken cancellationToken)
     {
-        _configuration = configuration;
-        _logger = logger;
-        _serviceProvider = serviceProvider;
-    }
+        var eventType = message["EventType"]?.ToString();
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        await Task.Delay(3000, stoppingToken); // дать приложению прогрузиться
-        var consumerConfig = new ConsumerConfig
+        if (eventType?.Contains("ContractValuesCalculatedEvent") == true)
         {
-            BootstrapServers = _configuration["Kafka:BootstrapServers"],
-            GroupId = "orchestrator-service-group",
-            AutoOffsetReset = AutoOffsetReset.Earliest
-        };
-
-        using var consumer = new ConsumerBuilder<Ignore, string>(consumerConfig).Build();
-        consumer.Subscribe(_configuration["Kafka:Topics:CalculateContractValues"]);
-
-        _logger.LogInformation("KafkaConsumerService CalculateContractValuesConsumer запущен.");
-        
-        try
+            var @event = message.ToObject<ContractValuesCalculatedEvent>();
+            if (@event != null) await ProcessContractValuesCalculatedEventAsync(@event, cancellationToken);
+        }
+        else if (eventType?.Contains("ContractScheduleCalculatedEvent") == true)
         {
-            while (!stoppingToken.IsCancellationRequested)
+            var @event = message.ToObject<ContractScheduleCalculatedEvent>();
+            if (@event != null)
             {
-                var result = consumer.Consume(stoppingToken);
-                if (result == null) continue;
-
-                var jsonObject = JObject.Parse(result.Message.Value);
-
-                if (jsonObject.Property("EventType").Value.ToString().Contains("ContractValuesCalculatedEvent"))
-                {
-                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
-                    var @event = jsonObject.ToObject<ContractValuesCalculatedEvent>();
-                    if (@event != null) await ProcessContractValuesCalculatedEventAsync(@event, stoppingToken);
-                }
-                if (jsonObject.Property("EventType").Value.ToString().Contains("ContractScheduleCalculatedEvent"))
-                {
-                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
-                    var @event = jsonObject.ToObject<ContractScheduleCalculatedEvent>();
-                    if (@event != null) await ProcessContractScheduleCalculatedEventAsync(@event, stoppingToken);
-                }
+                MetricsRegistry.StopScheduleLatencyTimer(@event.OperationId);
+                await ProcessContractScheduleCalculatedEventAsync(@event, cancellationToken);
             }
         }
-        catch (KafkaException ex)
-        {
-            _logger.LogError(ex, "Kafka временно недоступна или ошибка получения сообщения.");
-            await Task.Delay(1000, stoppingToken); // Ждем и пытаемся снова
-        }
-        finally
-        {
-            consumer.Close();
-        }
     }
+
+
     
     private async Task ProcessContractValuesCalculatedEventAsync(ContractValuesCalculatedEvent @event, CancellationToken cancellationToken)
     {
         try
         {
-            using var scope = _serviceProvider.CreateScope();
+            using var scope = ServiceProvider.CreateScope();
             var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
             await repository.SaveAsync(@event, @event.ContractId, @event.OperationId, cancellationToken);
             var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractValuesCalculatedEvent>>();
@@ -89,7 +59,7 @@ public class CalculateContractValuesConsumer : BackgroundService
     {
         try
         {
-            using var scope = _serviceProvider.CreateScope();
+            using var scope = ServiceProvider.CreateScope();
             var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
             await repository.SaveAsync(@event, @event.ContractId, @event.OperationId, cancellationToken);
             var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractScheduleCalculatedEvent>>();

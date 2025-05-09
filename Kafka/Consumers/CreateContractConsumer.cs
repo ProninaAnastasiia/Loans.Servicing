@@ -4,129 +4,75 @@ using Loans.Servicing.Kafka.Events.CreateDraftContract;
 using Loans.Servicing.Kafka.Events.GetContractApproved;
 using Loans.Servicing.Kafka.Events.InnerEvents;
 using Loans.Servicing.Kafka.Handlers;
-using Newtonsoft.Json.Linq;
 
 namespace Loans.Servicing.Kafka.Consumers;
+using Newtonsoft.Json.Linq;
 
-public class CreateContractConsumer : BackgroundService
+public class CreateContractConsumer : KafkaBackgroundConsumer
 {
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<CreateContractConsumer> _logger;
-    private readonly IServiceProvider _serviceProvider;
+    public CreateContractConsumer(
+        IConfiguration config,
+        IServiceProvider serviceProvider,
+        ILogger<CreateContractConsumer> logger)
+        : base(config, serviceProvider, logger,
+              topic: config["Kafka:Topics:CreateContractRequested"],
+              groupId: "orchestrator-service-group",
+              consumerName: nameof(CreateContractConsumer)) { }
 
-    public CreateContractConsumer(IConfiguration configuration, IServiceProvider serviceProvider, ILogger<CreateContractConsumer> logger)
+    protected override async Task HandleMessageAsync(JObject message, CancellationToken cancellationToken)
     {
-        _configuration = configuration;
-        _logger = logger;
-        _serviceProvider = serviceProvider;
+        var eventType = message["EventType"]?.ToString();
+
+        if (eventType?.Contains("LoanApplicationRecieved") == true)
+        {
+            var @event = message.ToObject<LoanApplicationRecieved>();
+            if (@event != null) await ProcessLoanApplicationRecievedAsync(@event, cancellationToken);
+        }
+        else if (eventType?.Contains("DraftContractCreatedEvent") == true)
+        {
+            var @event = message.ToObject<DraftContractCreatedEvent>();
+            if (@event != null) await ProcessDraftContractCreatedEventAsync(@event, cancellationToken);
+        }
+        else if (eventType?.Contains("CreateContractFailedEvent") == true)
+        {
+            var @event = message.ToObject<CreateContractFailedEvent>();
+            if (@event != null) await ProcessCreateContractFailedEventAsync(@event, cancellationToken);
+        }
+        else if (eventType?.Contains("ContractDetailsResponseEvent") == true)
+        {
+            var @event = message.ToObject<ContractDetailsResponseEvent>();
+            if (@event != null) await ProcessContractDetailsResponseEventAsync(@event, cancellationToken);
+        }
+        else if (eventType?.Contains("ContractSentToClientEvent") == true)
+        {
+            var @event = message.ToObject<ContractSentToClientEvent>();
+            if (@event != null) await ProcessContractSentToClientEventAsync(@event, cancellationToken);
+        }
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        await Task.Delay(3000, stoppingToken); // дать приложению прогрузиться
-        var consumerConfig = new ConsumerConfig
-        {
-            BootstrapServers = _configuration["Kafka:BootstrapServers"],
-            GroupId = "orchestrator-service-group",
-            AutoOffsetReset = AutoOffsetReset.Earliest
-        };
-
-        using var consumer = new ConsumerBuilder<Ignore, string>(consumerConfig).Build();
-        consumer.Subscribe(_configuration["Kafka:Topics:CreateContractRequested"]);
-
-        _logger.LogInformation("KafkaConsumerService CreateContractConsumer запущен.");
-        
-        try
-        {
-            while (!stoppingToken.IsCancellationRequested)
-            {
-                var result = consumer.Consume(stoppingToken);
-                if (result == null) continue;
-
-                var jsonObject = JObject.Parse(result.Message.Value);
-
-                if (jsonObject.Property("EventType").Value.ToString().Contains("LoanApplicationRecieved"))
-                {
-                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
-                    var @event = jsonObject.ToObject<LoanApplicationRecieved>();
-                    if (@event != null) await ProcessLoanApplicationRecievedAsync(@event, stoppingToken);
-                }
-                else if (jsonObject.Property("EventType").Value.ToString().Contains("DraftContractCreatedEvent"))
-                {
-                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
-                    var @event = jsonObject.ToObject<DraftContractCreatedEvent>();
-                    if (@event != null) await ProcessDraftContractCreatedEventAsync(@event, stoppingToken);
-                }
-                else if (jsonObject.Property("EventType").Value.ToString().Contains("CreateContractFailedEvent"))
-                {
-                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
-                    var @event = jsonObject.ToObject<CreateContractFailedEvent>();
-                    if (@event != null) await ProcessCreateContractFailedEventAsync(@event, stoppingToken);
-                }
-                else if (jsonObject.Property("EventType").Value.ToString().Contains("ContractDetailsResponseEvent"))
-                {
-                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
-                    var @event = jsonObject.ToObject<ContractDetailsResponseEvent>();
-                    if (@event != null) await ProcessContractDetailsResponseEventAsync(@event, stoppingToken);
-                }
-                else if (jsonObject.Property("EventType").Value.ToString().Contains("ContractSentToClientEvent"))
-                {
-                    _logger.LogInformation("Получено сообщение из Kafka: {Message}", result.Message.Value);
-                    var @event = jsonObject.ToObject<ContractSentToClientEvent>();
-                    if (@event != null) await ProcessContractSentToClientEventAsync(@event, stoppingToken);
-                }
-            }
-        }
-        catch (KafkaException ex)
-        {
-            _logger.LogError(ex, "Kafka временно недоступна или ошибка получения сообщения.");
-            await Task.Delay(1000, stoppingToken); // Ждем и пытаемся снова
-        }
-        finally
-        {
-            consumer.Close();
-        }
-    }
-    
     private async Task ProcessLoanApplicationRecievedAsync(LoanApplicationRecieved @event, CancellationToken cancellationToken)
     {
-        try
-        {
-            using var scope = _serviceProvider.CreateScope();
-            var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
-            await repository.SaveAsync(@event, @event.ClientId, @event.OperationId, cancellationToken);
-            var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<LoanApplicationRecieved>>();
-            await handler.HandleAsync(@event, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка при обработке события LoanApplicationRecieved: {EventId}, {OperationId}", @event.EventId, @event.OperationId);
-            // Тут можно реализовать retry или логирование в dead-letter-topic
-        }
+        using var scope = ServiceProvider.CreateScope();
+        var repo = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
+        var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<LoanApplicationRecieved>>();
+        await repo.SaveAsync(@event, @event.ClientId, @event.OperationId, cancellationToken);
+        await handler.HandleAsync(@event, cancellationToken);
     }
-    
+
     private async Task ProcessDraftContractCreatedEventAsync(DraftContractCreatedEvent @event, CancellationToken cancellationToken)
     {
-        try
-        {
-            using var scope = _serviceProvider.CreateScope();
-            var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
-            await repository.SaveAsync(@event, @event.ContractId, @event.OperationId, cancellationToken);
-            var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<DraftContractCreatedEvent>>();
-            await handler.HandleAsync(@event, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка при обработке события DraftContractCreatedEvent: {EventId}, {OperationId}", @event.EventId, @event.OperationId);
-            // Тут можно реализовать retry или логирование в dead-letter-topic
-        }
+        using var scope = ServiceProvider.CreateScope();
+        var repo = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
+        var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<DraftContractCreatedEvent>>();
+        await repo.SaveAsync(@event, @event.ContractId, @event.OperationId, cancellationToken);
+        await handler.HandleAsync(@event, cancellationToken);
     }
     
     private async Task ProcessCreateContractFailedEventAsync(CreateContractFailedEvent @event, CancellationToken cancellationToken)
     {
         try
         {
-            using var scope = _serviceProvider.CreateScope();
+            using var scope = ServiceProvider.CreateScope();
             var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
             await repository.SaveAsync(@event, @event.OperationId, @event.OperationId, cancellationToken);
             var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<CreateContractFailedEvent>>();
@@ -134,7 +80,7 @@ public class CreateContractConsumer : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка при обработке события CreateContractFailedEvent: {EventId}, {OperationId}", @event.EventId, @event.OperationId);
+            _logger.LogError(ex, "Ошибка при обработке события ContractDetailsResponseEvent: {EventId}, {OperationId}", @event.EventId, @event.OperationId);
             // Тут можно реализовать retry или логирование в dead-letter-topic
         }
     }
@@ -142,7 +88,7 @@ public class CreateContractConsumer : BackgroundService
     {
         try
         {
-            using var scope = _serviceProvider.CreateScope();
+            using var scope = ServiceProvider.CreateScope();
             var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
             await repository.SaveAsync(@event, @event.OperationId, @event.OperationId, cancellationToken);
             var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractDetailsResponseEvent>>();
@@ -158,7 +104,7 @@ public class CreateContractConsumer : BackgroundService
     {
         try
         {
-            using var scope = _serviceProvider.CreateScope();
+            using var scope = ServiceProvider.CreateScope();
             var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
             await repository.SaveAsync(@event, @event.OperationId, @event.OperationId, cancellationToken);
             var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractSentToClientEvent>>();
@@ -170,4 +116,5 @@ public class CreateContractConsumer : BackgroundService
             // Тут можно реализовать retry или логирование в dead-letter-topic
         }
     }
+    
 }

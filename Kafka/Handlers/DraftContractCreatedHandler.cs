@@ -37,6 +37,7 @@ public class DraftContractCreatedHandler : IEventHandler<DraftContractCreatedEve
             var topic = _config["Kafka:Topics:CalculateContractValues"];
 
             await _producer.PublishAsync(topic, jsonMessage);
+            MetricsRegistry.StartScheduleLatencyTimer(@event.OperationId);
         }
         catch (Exception e)
         {

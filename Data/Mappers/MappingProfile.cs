@@ -15,8 +15,8 @@ public class MappingProfile : Profile
             .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveOperationId));
         CreateMap<LoanApplicationRequest, CreateContractRequestedEvent>()
             .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveOperationId));
-        
-        CreateMap<LoanApplicationRequest, LoanApplicationRecieved>();
+        CreateMap<LoanApplicationRequest, LoanApplicationRecieved>()
+            .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveOperationId));
         
         CreateMap<LoanApplicationRecieved, LoanApplicationRequest>()
             .ForMember(dest => dest.ApplicationId, opt => opt.MapFrom(src => src.ApplicationId.ToString()))
