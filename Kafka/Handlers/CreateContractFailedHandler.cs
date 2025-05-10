@@ -14,12 +14,15 @@ public class CreateContractFailedHandler : IEventHandler<CreateContractFailedEve
     private readonly ILogger<CreateContractFailedHandler> _logger;
     private readonly IMapper _mapper;
     private readonly IOperationRepository _operationRepository;
+    private readonly IEventsRepository _eventsRepository;
+
     private readonly KafkaProducerService _producer;
 
-    public CreateContractFailedHandler(IOperationRepository operationRepository,
+    public CreateContractFailedHandler(IOperationRepository operationRepository, IEventsRepository eventsRepository,
         ILogger<CreateContractFailedHandler> logger, IMapper mapper, IConfiguration config, KafkaProducerService producer)
     {
         _operationRepository = operationRepository;
+        _eventsRepository = eventsRepository;
         _logger = logger;
         _mapper = mapper;
         _config = config;
@@ -30,6 +33,7 @@ public class CreateContractFailedHandler : IEventHandler<CreateContractFailedEve
     {
         try
         {
+            await _eventsRepository.SaveAsync(contractEvent, contractEvent.OperationId, contractEvent.OperationId, cancellationToken);
             var operation = await _operationRepository.GetByIdAsync(contractEvent.OperationId);
             await _operationRepository.UpdateStatusAsync(operation, OperationStatus.Failed);
 

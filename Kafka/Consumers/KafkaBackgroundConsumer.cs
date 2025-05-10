@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using Loans.Servicing.Services;
 using Newtonsoft.Json.Linq;
 
 namespace Loans.Servicing.Kafka.Consumers;
@@ -11,12 +12,13 @@ public abstract class KafkaBackgroundConsumer : BackgroundService
     private readonly string _groupId;
     private readonly int _parallelism;
     private readonly string _consumerName;
-
     protected IServiceProvider ServiceProvider { get; }
+    protected IHandlerDispatcher HandlerDispatcher { get; }
 
     protected KafkaBackgroundConsumer(
         IConfiguration configuration,
         IServiceProvider serviceProvider,
+        IHandlerDispatcher handlerDispatcher,
         ILogger logger,
         string topic,
         string groupId,
@@ -24,7 +26,9 @@ public abstract class KafkaBackgroundConsumer : BackgroundService
         int parallelism = 10)
     {
         _configuration = configuration;
+        
         ServiceProvider = serviceProvider;
+        HandlerDispatcher = handlerDispatcher;
         _logger = logger;
         _topic = topic;
         _groupId = groupId;
@@ -82,7 +86,7 @@ public abstract class KafkaBackgroundConsumer : BackgroundService
         catch (OperationCanceledException) { }
         catch (KafkaException ex)
         {
-            _logger.LogError(ex, "[{ConsumerName}] Kafka ошибка.");
+            _logger.LogError(ex, "[{ConsumerName}] Kafka ошибка.", _consumerName);
         }
         finally
         {

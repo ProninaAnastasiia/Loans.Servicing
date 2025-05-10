@@ -14,11 +14,13 @@ public class DraftContractCreatedHandler : IEventHandler<DraftContractCreatedEve
     private readonly IMapper _mapper;
     private readonly IOperationRepository _operationRepository;
     private readonly KafkaProducerService _producer;
+    private readonly IEventsRepository _eventsRepository;
 
-    public DraftContractCreatedHandler(IOperationRepository operationRepository,
+    public DraftContractCreatedHandler(IOperationRepository operationRepository, IEventsRepository eventsRepository,
         ILogger<DraftContractCreatedHandler> logger, IMapper mapper, IConfiguration config, KafkaProducerService producer)
     {
         _operationRepository = operationRepository;
+        _eventsRepository = eventsRepository;
         _logger = logger;
         _mapper = mapper;
         _config = config;
@@ -29,6 +31,7 @@ public class DraftContractCreatedHandler : IEventHandler<DraftContractCreatedEve
     {
         try
         {
+            await _eventsRepository.SaveAsync(contractEvent, contractEvent.ContractId, contractEvent.OperationId, cancellationToken);
             var operation = await _operationRepository.GetByIdAsync(contractEvent.OperationId);
             await _operationRepository.UpdateStatusAsync(operation, OperationStatus.InProgress);
 

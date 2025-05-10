@@ -1,5 +1,4 @@
-﻿using Loans.Servicing.Data.Repositories;
-using Loans.Servicing.Kafka.Events.CalculateContractValues;
+﻿using Loans.Servicing.Kafka.Events.CalculateContractValues;
 using Loans.Servicing.Kafka.Events.GetContractApproved;
 using Loans.Servicing.Services;
 using Newtonsoft.Json.Linq;
@@ -10,9 +9,10 @@ public class UpdateContractConsumer : KafkaBackgroundConsumer
 {
     public UpdateContractConsumer(
         IConfiguration config,
+        IHandlerDispatcher handlerDispatcher,
         IServiceProvider serviceProvider,
-        ILogger<UpdateContractConsumer> logger)
-        : base(config, serviceProvider, logger,
+        ILogger<CalculateContractValuesConsumer> logger)
+        : base(config, serviceProvider, handlerDispatcher, logger,
             topic: config["Kafka:Topics:UpdateContractRequested"],
             groupId: "orchestrator-service-group",
             consumerName: nameof(UpdateContractConsumer)) { }
@@ -42,13 +42,7 @@ public class UpdateContractConsumer : KafkaBackgroundConsumer
     {
         try
         {
-            using var scope = ServiceProvider.CreateScope();
-            var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
-            await repository.SaveAsync(@event, @event.OperationId, @event.OperationId, cancellationToken);
-            /*var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractStatusUpdatedEvent>>();
-            await handler.HandleAsync(@event, cancellationToken);*/
-            _logger.LogInformation("Статус контракта изменен.");
-            MetricsRegistry.StopTimer(@event.OperationId); // <-- СТОП
+            await HandlerDispatcher.DispatchAsync(@event, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -59,49 +53,14 @@ public class UpdateContractConsumer : KafkaBackgroundConsumer
     
     private async Task ProcessEventAsync(EventBase @event, CancellationToken cancellationToken)
     {
-        
-        using var scope = ServiceProvider.CreateScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
-        var taskScheduler = scope.ServiceProvider.GetRequiredService<IDelayedTaskScheduler>();
         try
         {
-            Guid contractId;
-            Guid operationId;
-            switch (@event)
-            {
-                case ContractValuesUpdatedEvent valuesEvent:
-                    contractId = valuesEvent.ContractId;
-                    operationId = valuesEvent.OperationId;
-                    break;
-
-                case ContractScheduleUpdatedEvent scheduleEvent:
-                    contractId = scheduleEvent.ContractId;
-                    operationId = scheduleEvent.OperationId;
-                    break;
-
-                default:
-                    return;
-            }
-            
-            await repository.SaveAsync(@event, contractId, operationId, cancellationToken);
-
-            // Получаем все события для этого контракта и операции
-            var events = await repository.GetEventsAsync(contractId, operationId, cancellationToken);
-
-            // Проверяем, есть ли оба типа событий
-            var valuesEventCheck = events.OfType<ContractValuesUpdatedEvent>().FirstOrDefault();
-            var scheduleEventCheck = events.OfType<ContractScheduleUpdatedEvent>().FirstOrDefault();
-
-            if (valuesEventCheck != null && scheduleEventCheck != null)
-            {
-                // Договор готов к подписанию. Надо завести задачу в плане операций, чтобы отправить договор клиенту
-                var newEvent = new ContractDetailsRequestedEvent(contractId, operationId);
-                await taskScheduler.ScheduleTaskAsync(newEvent, "update-contract-requested", contractId, operationId, TimeSpan.FromSeconds(5), cancellationToken);
-            }
+            await HandlerDispatcher.DispatchAsync(@event, cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка при обработке события: {EventId}, {EventType}", @event.EventId, @event.EventType);
+            _logger.LogError(ex, "Ошибка при обработке события ContractValuesUpdatedEvent или ContractScheduleUpdatedEvent: {EventId}", @event.EventId);
+            // Тут можно реализовать retry или логирование в dead-letter-topic
         }
     }
 }

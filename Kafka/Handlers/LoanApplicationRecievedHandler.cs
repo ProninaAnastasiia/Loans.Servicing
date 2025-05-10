@@ -33,6 +33,7 @@ public class LoanApplicationRecievedHandler : IEventHandler<LoanApplicationRecie
     {
         try
         {
+            await _eventsRepository.SaveAsync(applicationEvent, applicationEvent.OperationId, applicationEvent.OperationId, cancellationToken);
             var application = _mapper.Map<LoanApplicationRequest>(applicationEvent);
             var operation = new OperationEntity
             {

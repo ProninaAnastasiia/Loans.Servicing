@@ -1,6 +1,5 @@
-﻿using Loans.Servicing.Data.Repositories;
-using Loans.Servicing.Kafka.Events.CalculateContractValues;
-using Loans.Servicing.Kafka.Handlers;
+﻿using Loans.Servicing.Kafka.Events.CalculateContractValues;
+using Loans.Servicing.Services;
 using Newtonsoft.Json.Linq;
 
 namespace Loans.Servicing.Kafka.Consumers;
@@ -9,9 +8,10 @@ public class CalculateContractValuesConsumer : KafkaBackgroundConsumer
 {
     public CalculateContractValuesConsumer(
         IConfiguration config,
+        IHandlerDispatcher handlerDispatcher,
         IServiceProvider serviceProvider,
         ILogger<CalculateContractValuesConsumer> logger)
-        : base(config, serviceProvider, logger,
+        : base(config, serviceProvider, handlerDispatcher, logger,
             topic: config["Kafka:Topics:CalculateContractValues"],
             groupId: "orchestrator-service-group",
             consumerName: nameof(CalculateContractValuesConsumer)) { }
@@ -35,18 +35,12 @@ public class CalculateContractValuesConsumer : KafkaBackgroundConsumer
             }
         }
     }
-
-
     
     private async Task ProcessContractValuesCalculatedEventAsync(ContractValuesCalculatedEvent @event, CancellationToken cancellationToken)
     {
         try
         {
-            using var scope = ServiceProvider.CreateScope();
-            var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
-            await repository.SaveAsync(@event, @event.ContractId, @event.OperationId, cancellationToken);
-            var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractValuesCalculatedEvent>>();
-            await handler.HandleAsync(@event, cancellationToken);
+            await HandlerDispatcher.DispatchAsync(@event, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -59,11 +53,7 @@ public class CalculateContractValuesConsumer : KafkaBackgroundConsumer
     {
         try
         {
-            using var scope = ServiceProvider.CreateScope();
-            var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
-            await repository.SaveAsync(@event, @event.ContractId, @event.OperationId, cancellationToken);
-            var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractScheduleCalculatedEvent>>();
-            await handler.HandleAsync(@event, cancellationToken);
+            await HandlerDispatcher.DispatchAsync(@event, cancellationToken);
         }
         catch (Exception ex)
         {

@@ -4,6 +4,7 @@ using Loans.Servicing.Kafka.Events.CreateDraftContract;
 using Loans.Servicing.Kafka.Events.GetContractApproved;
 using Loans.Servicing.Kafka.Events.InnerEvents;
 using Loans.Servicing.Kafka.Handlers;
+using Loans.Servicing.Services;
 
 namespace Loans.Servicing.Kafka.Consumers;
 using Newtonsoft.Json.Linq;
@@ -13,8 +14,9 @@ public class CreateContractConsumer : KafkaBackgroundConsumer
     public CreateContractConsumer(
         IConfiguration config,
         IServiceProvider serviceProvider,
-        ILogger<CreateContractConsumer> logger)
-        : base(config, serviceProvider, logger,
+        IHandlerDispatcher handlerDispatcher,
+        ILogger<CalculateContractValuesConsumer> logger)
+        : base(config, serviceProvider, handlerDispatcher, logger,
               topic: config["Kafka:Topics:CreateContractRequested"],
               groupId: "orchestrator-service-group",
               consumerName: nameof(CreateContractConsumer)) { }
@@ -52,31 +54,35 @@ public class CreateContractConsumer : KafkaBackgroundConsumer
 
     private async Task ProcessLoanApplicationRecievedAsync(LoanApplicationRecieved @event, CancellationToken cancellationToken)
     {
-        using var scope = ServiceProvider.CreateScope();
-        var repo = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
-        var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<LoanApplicationRecieved>>();
-        await repo.SaveAsync(@event, @event.ClientId, @event.OperationId, cancellationToken);
-        await handler.HandleAsync(@event, cancellationToken);
+        try
+        {
+            await HandlerDispatcher.DispatchAsync(@event, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при обработке события LoanApplicationRecieved: {EventId}, {OperationId}", @event.EventId, @event.OperationId);
+            // Тут можно реализовать retry или логирование в dead-letter-topic
+        }
     }
 
     private async Task ProcessDraftContractCreatedEventAsync(DraftContractCreatedEvent @event, CancellationToken cancellationToken)
     {
-        using var scope = ServiceProvider.CreateScope();
-        var repo = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
-        var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<DraftContractCreatedEvent>>();
-        await repo.SaveAsync(@event, @event.ContractId, @event.OperationId, cancellationToken);
-        await handler.HandleAsync(@event, cancellationToken);
+        try
+        {
+            await HandlerDispatcher.DispatchAsync(@event, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при обработке события LoanApplicationRecieved: {EventId}, {OperationId}", @event.EventId, @event.OperationId);
+            // Тут можно реализовать retry или логирование в dead-letter-topic
+        }
     }
     
     private async Task ProcessCreateContractFailedEventAsync(CreateContractFailedEvent @event, CancellationToken cancellationToken)
     {
         try
         {
-            using var scope = ServiceProvider.CreateScope();
-            var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
-            await repository.SaveAsync(@event, @event.OperationId, @event.OperationId, cancellationToken);
-            var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<CreateContractFailedEvent>>();
-            await handler.HandleAsync(@event, cancellationToken);
+            await HandlerDispatcher.DispatchAsync(@event, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -88,11 +94,7 @@ public class CreateContractConsumer : KafkaBackgroundConsumer
     {
         try
         {
-            using var scope = ServiceProvider.CreateScope();
-            var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
-            await repository.SaveAsync(@event, @event.OperationId, @event.OperationId, cancellationToken);
-            var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractDetailsResponseEvent>>();
-            await handler.HandleAsync(@event, cancellationToken);
+            await HandlerDispatcher.DispatchAsync(@event, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -104,11 +106,7 @@ public class CreateContractConsumer : KafkaBackgroundConsumer
     {
         try
         {
-            using var scope = ServiceProvider.CreateScope();
-            var repository = scope.ServiceProvider.GetRequiredService<IEventsRepository>();
-            await repository.SaveAsync(@event, @event.OperationId, @event.OperationId, cancellationToken);
-            var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<ContractSentToClientEvent>>();
-            await handler.HandleAsync(@event, cancellationToken);
+            await HandlerDispatcher.DispatchAsync(@event, cancellationToken);
         }
         catch (Exception ex)
         {

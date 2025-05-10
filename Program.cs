@@ -40,13 +40,15 @@ builder.Services.AddScoped<IEventHandler<ContractDetailsResponseEvent>, Contract
 builder.Services.AddScoped<IEventHandler<ContractSentToClientEvent>, ContractSentToClientHandler>();
 
 builder.Services.AddScoped<IDelayedTaskScheduler, DelayedTaskScheduler>();
-
+builder.Services.AddScoped(typeof(HangfireHandlerExecutor<>));
 
 builder.Services.AddHostedService<CreateContractConsumer>();
 builder.Services.AddHostedService<UpdateContractConsumer>();
 builder.Services.AddHostedService<CalculateContractValuesConsumer>();
 
 builder.Services.AddSingleton<KafkaProducerService>();
+builder.Services.AddSingleton<IHandlerDispatcher, HangfireHandlerDispatcher>();
+
 
 builder.Services.AddHangfire(configuration =>
 {
