@@ -22,18 +22,18 @@ public class ContractDetailsResponseHandler : IEventHandler<ContractDetailsRespo
         _eventsRepository = eventsRepository;
     }
 
-    public async Task HandleAsync(ContractDetailsResponseEvent @event, CancellationToken cancellationToken)
+    public async Task HandleAsync(ContractDetailsResponseEvent innerEvent, CancellationToken cancellationToken)
     {
         try
         {
-            await _eventsRepository.SaveAsync(@event, @event.ContractId, @event.OperationId, cancellationToken);
-            var newEvent = _mapper.Map<ContractSentToClientEvent>(@event);
+            await _eventsRepository.SaveAsync(innerEvent, innerEvent.ContractId, innerEvent.OperationId, cancellationToken);
+            var newEvent = _mapper.Map<ContractSentToClientEvent>(innerEvent);
             var topic = _config["Kafka:Topics:CreateContractRequested"];
-            await _delayedTaskScheduler.ScheduleTaskAsync(newEvent, topic, @event.ContractId, @event.OperationId, TimeSpan.FromSeconds(5),cancellationToken);
+            await _delayedTaskScheduler.ScheduleTaskAsync(newEvent, topic, innerEvent.ContractId, innerEvent.OperationId, TimeSpan.FromSeconds(5),cancellationToken);
         }
         catch (Exception e)
         {
-            _logger.LogError("Failed to handle ContractScheduleCalculatedEvent. ContractId: {ContractId}, OperationId: {OperationId}. Exception: {e}", @event.ContractId , @event.OperationId, e.Message);
+            _logger.LogError("Failed to handle ContractScheduleCalculatedEvent. ContractId: {ContractId}, OperationId: {OperationId}. Exception: {e}", innerEvent.ContractId , innerEvent.OperationId, e.Message);
         }
     }
 }

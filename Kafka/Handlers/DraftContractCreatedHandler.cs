@@ -27,15 +27,15 @@ public class DraftContractCreatedHandler : IEventHandler<DraftContractCreatedEve
         _producer = producer;
     }
     
-    public async Task HandleAsync(DraftContractCreatedEvent contractEvent, CancellationToken cancellationToken)
+    public async Task HandleAsync(DraftContractCreatedEvent innerEvent, CancellationToken cancellationToken)
     {
         try
         {
-            await _eventsRepository.SaveAsync(contractEvent, contractEvent.ContractId, contractEvent.OperationId, cancellationToken);
-            var operation = await _operationRepository.GetByIdAsync(contractEvent.OperationId);
+            await _eventsRepository.SaveAsync(innerEvent, innerEvent.ContractId, innerEvent.OperationId, cancellationToken);
+            var operation = await _operationRepository.GetByIdAsync(innerEvent.OperationId);
             await _operationRepository.UpdateStatusAsync(operation, OperationStatus.InProgress);
 
-            var @event = _mapper.Map<CalculateContractValuesEvent>(contractEvent);
+            var @event = _mapper.Map<CalculateContractValuesEvent>(innerEvent);
             var jsonMessage = JsonConvert.SerializeObject(@event);
             var topic = _config["Kafka:Topics:CalculateContractValues"];
 
@@ -44,7 +44,7 @@ public class DraftContractCreatedHandler : IEventHandler<DraftContractCreatedEve
         }
         catch (Exception e)
         {
-            _logger.LogError("Failed to handle DraftContractCreatedEvent. ContractId: {ContractId}, OperationId: {OperationId}. Exception: {e}",contractEvent.ContractId , contractEvent.OperationId, e.Message);
+            _logger.LogError("Failed to handle DraftContractCreatedEvent. ContractId: {ContractId}, OperationId: {OperationId}. Exception: {e}",innerEvent.ContractId , innerEvent.OperationId, e.Message);
         }
     }
 }

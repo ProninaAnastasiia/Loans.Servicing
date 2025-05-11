@@ -29,12 +29,12 @@ public class CreateContractFailedHandler : IEventHandler<CreateContractFailedEve
         _producer = producer;
     }
     
-    public async Task HandleAsync(CreateContractFailedEvent contractEvent, CancellationToken cancellationToken)
+    public async Task HandleAsync(CreateContractFailedEvent innerEvent, CancellationToken cancellationToken)
     {
         try
         {
-            await _eventsRepository.SaveAsync(contractEvent, contractEvent.OperationId, contractEvent.OperationId, cancellationToken);
-            var operation = await _operationRepository.GetByIdAsync(contractEvent.OperationId);
+            await _eventsRepository.SaveAsync(innerEvent, innerEvent.OperationId, innerEvent.OperationId, cancellationToken);
+            var operation = await _operationRepository.GetByIdAsync(innerEvent.OperationId);
             await _operationRepository.UpdateStatusAsync(operation, OperationStatus.Failed);
 
             var operationId = Guid.NewGuid();
@@ -58,7 +58,7 @@ public class CreateContractFailedHandler : IEventHandler<CreateContractFailedEve
         }
         catch (Exception e)
         {
-            _logger.LogError("Failed to handle CreateContractFailedEvent. OperationId: {OperationId}. Exception: {e}", contractEvent.OperationId, e.Message);
+            _logger.LogError("Failed to handle CreateContractFailedEvent. OperationId: {OperationId}. Exception: {e}", innerEvent.OperationId, e.Message);
 
         }
     }

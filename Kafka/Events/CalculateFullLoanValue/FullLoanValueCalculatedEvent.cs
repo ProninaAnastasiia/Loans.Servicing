@@ -1,3 +1,3 @@
 ﻿namespace Loans.Servicing.Kafka.Events.CalculateFullLoanValue;
 
-public record FullLoanValueCalculatedEvent(Guid ContractId, decimal FullLoanValue, Guid OperationId) : EventBase;
+public record FullLoanValueCalculatedEvent(decimal FullLoanValue, Guid OperationId) : EventBase;

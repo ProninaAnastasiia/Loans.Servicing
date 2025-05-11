@@ -11,7 +11,7 @@ public class UpdateContractConsumer : KafkaBackgroundConsumer
         IConfiguration config,
         IHandlerDispatcher handlerDispatcher,
         IServiceProvider serviceProvider,
-        ILogger<CalculateContractValuesConsumer> logger)
+        ILogger<UpdateContractConsumer> logger)
         : base(config, serviceProvider, handlerDispatcher, logger,
             topic: config["Kafka:Topics:UpdateContractRequested"],
             groupId: "orchestrator-service-group",

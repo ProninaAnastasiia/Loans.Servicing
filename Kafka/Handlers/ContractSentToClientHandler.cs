@@ -19,12 +19,12 @@ public class ContractSentToClientHandler : IEventHandler<ContractSentToClientEve
         _producer = producer;
     }
 
-    public async Task HandleAsync(ContractSentToClientEvent @event, CancellationToken cancellationToken)
+    public async Task HandleAsync(ContractSentToClientEvent innerEvent, CancellationToken cancellationToken)
     {
         try
         {
-            await _eventsRepository.SaveAsync(@event, @event.ContractId, @event.OperationId, cancellationToken);
-            var newEvent = new UpdateContractStatusEvent(@event.ContractId, "Подписан", @event.OperationId);
+            await _eventsRepository.SaveAsync(innerEvent, innerEvent.ContractId, innerEvent.OperationId, cancellationToken);
+            var newEvent = new UpdateContractStatusEvent(innerEvent.ContractId, "Подписан", innerEvent.OperationId);
             var jsonMessage = JsonConvert.SerializeObject(newEvent);
             var topic = _config["Kafka:Topics:UpdateContractRequested"];
 
@@ -32,7 +32,7 @@ public class ContractSentToClientHandler : IEventHandler<ContractSentToClientEve
         }
         catch (Exception e)
         {
-            _logger.LogError("Failed to handle ContractScheduleCalculatedEvent. ContractId: {ContractId}, OperationId: {OperationId}. Exception: {e}", @event.ContractId , @event.OperationId, e.Message);
+            _logger.LogError("Failed to handle ContractScheduleCalculatedEvent. ContractId: {ContractId}, OperationId: {OperationId}. Exception: {e}", innerEvent.ContractId , innerEvent.OperationId, e.Message);
         }
     }
 }

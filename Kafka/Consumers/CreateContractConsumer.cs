@@ -1,9 +1,6 @@
-﻿using Confluent.Kafka;
-using Loans.Servicing.Data.Repositories;
-using Loans.Servicing.Kafka.Events.CreateDraftContract;
+﻿using Loans.Servicing.Kafka.Events.CreateDraftContract;
 using Loans.Servicing.Kafka.Events.GetContractApproved;
 using Loans.Servicing.Kafka.Events.InnerEvents;
-using Loans.Servicing.Kafka.Handlers;
 using Loans.Servicing.Services;
 
 namespace Loans.Servicing.Kafka.Consumers;
@@ -15,7 +12,7 @@ public class CreateContractConsumer : KafkaBackgroundConsumer
         IConfiguration config,
         IServiceProvider serviceProvider,
         IHandlerDispatcher handlerDispatcher,
-        ILogger<CalculateContractValuesConsumer> logger)
+        ILogger<CreateContractConsumer> logger)
         : base(config, serviceProvider, handlerDispatcher, logger,
               topic: config["Kafka:Topics:CreateContractRequested"],
               groupId: "orchestrator-service-group",

@@ -29,28 +29,28 @@ public class LoanApplicationRecievedHandler : IEventHandler<LoanApplicationRecie
         _producer = producer;
     }
     
-    public async Task HandleAsync(LoanApplicationRecieved applicationEvent, CancellationToken cancellationToken)
+    public async Task HandleAsync(LoanApplicationRecieved innerEvent, CancellationToken cancellationToken)
     {
         try
         {
-            await _eventsRepository.SaveAsync(applicationEvent, applicationEvent.OperationId, applicationEvent.OperationId, cancellationToken);
-            var application = _mapper.Map<LoanApplicationRequest>(applicationEvent);
+            await _eventsRepository.SaveAsync(innerEvent, innerEvent.OperationId, innerEvent.OperationId, cancellationToken);
+            var application = _mapper.Map<LoanApplicationRequest>(innerEvent);
             var operation = new OperationEntity
             {
-                OperationId = applicationEvent.OperationId,
+                OperationId = innerEvent.OperationId,
                 Description = "Создание черновика контракта",
                 Status = OperationStatus.Started,
                 ContextJson = JsonConvert.SerializeObject(application),
                 StartedAt = DateTime.UtcNow
             };
             await _operationRepository.SaveAsync(operation);
-            var @event = _mapper.Map<CreateContractRequestedEvent>(application, opt => opt.Items["OperationId"] = applicationEvent.OperationId);
+            var @event = _mapper.Map<CreateContractRequestedEvent>(application, opt => opt.Items["OperationId"] = innerEvent.OperationId);
             var jsonMessage = JsonConvert.SerializeObject(@event);
             var topic = _config["Kafka:Topics:CreateContractRequested"];
     
             await _producer.PublishAsync(topic, jsonMessage);
     
-            await _eventsRepository.SaveAsync(@event, applicationEvent.OperationId, @event.OperationId, cancellationToken);
+            await _eventsRepository.SaveAsync(@event, innerEvent.OperationId, @event.OperationId, cancellationToken);
         }
         catch (Exception e)
         {

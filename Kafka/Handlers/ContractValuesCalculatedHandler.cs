@@ -19,18 +19,18 @@ public class ContractValuesCalculatedHandler : IEventHandler<ContractValuesCalcu
         _eventsRepository = eventsRepository;
     }
 
-    public async Task HandleAsync(ContractValuesCalculatedEvent @event, CancellationToken cancellationToken)
+    public async Task HandleAsync(ContractValuesCalculatedEvent innerEvent, CancellationToken cancellationToken)
     {
         try
         {
-            await _eventsRepository.SaveAsync(@event, @event.ContractId, @event.OperationId, cancellationToken);
-            var jsonMessage = JsonConvert.SerializeObject(@event);
+            await _eventsRepository.SaveAsync(innerEvent, innerEvent.ContractId, innerEvent.OperationId, cancellationToken);
+            var jsonMessage = JsonConvert.SerializeObject(innerEvent);
             var topic = _config["Kafka:Topics:UpdateContractRequested"];
             await _producer.PublishAsync(topic, jsonMessage);
         }
         catch (Exception e)
         {
-            _logger.LogError("Failed to handle ContractValuesCalculatedEvent. ContractId: {ContractId}, OperationId: {OperationId}. Exception: {e}", @event.ContractId , @event.OperationId, e.Message);
+            _logger.LogError("Failed to handle ContractValuesCalculatedEvent. ContractId: {ContractId}, OperationId: {OperationId}. Exception: {e}", innerEvent.ContractId , innerEvent.OperationId, e.Message);
         }
     }
 }

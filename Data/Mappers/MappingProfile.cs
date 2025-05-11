@@ -1,6 +1,8 @@
 ﻿using AutoMapper;
 using Loans.Servicing.Data.Dto;
 using Loans.Servicing.Kafka.Events.CalculateContractValues;
+using Loans.Servicing.Kafka.Events.CalculateFullLoanValue;
+using Loans.Servicing.Kafka.Events.CalculateRepaymentSchedule;
 using Loans.Servicing.Kafka.Events.CreateDraftContract;
 using Loans.Servicing.Kafka.Events.GetContractApproved;
 using Loans.Servicing.Kafka.Events.InnerEvents;
@@ -17,6 +19,17 @@ public class MappingProfile : Profile
             .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveOperationId));
         CreateMap<LoanApplicationRequest, LoanApplicationRecieved>()
             .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveOperationId));
+        CreateMap<CalculateScheduleRequest, CalculateScheduleRequested>()
+            .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveScheduleOperationId));
+        CreateMap<CalculateScheduleRequest, CalculateRepaymentScheduleEvent>()
+            .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveScheduleOperationId));
+        CreateMap<CalculateFullLoanValueRequest, CalculateFullLoanValueRequested>()
+            .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveFullLoanValueOperationId));
+        CreateMap<CalculateFullLoanValueRequest, CalculateFullLoanValueEvent>()
+            .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveFullLoanValueOperationId));
+        
+        CreateMap<CalculateScheduleRequested, CalculateScheduleRequest>(); 
+        CreateMap<CalculateFullLoanValueRequested, CalculateFullLoanValueRequest>(); 
         
         CreateMap<LoanApplicationRecieved, LoanApplicationRequest>()
             .ForMember(dest => dest.ApplicationId, opt => opt.MapFrom(src => src.ApplicationId.ToString()))
@@ -37,6 +50,16 @@ public class MappingProfile : Profile
     }
 
     private Guid ResolveOperationId(LoanApplicationRequest src, ResolutionContext context)
+    {
+        return (Guid)context.Items["OperationId"];
+    }
+    
+    private Guid ResolveScheduleOperationId(CalculateScheduleRequest src, ResolutionContext context)
+    {
+        return (Guid)context.Items["OperationId"];
+    }
+    
+    private Guid ResolveFullLoanValueOperationId(CalculateFullLoanValueRequest src, ResolutionContext context)
     {
         return (Guid)context.Items["OperationId"];
     }

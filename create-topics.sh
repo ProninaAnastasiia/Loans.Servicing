@@ -9,6 +9,7 @@ TOPICS=(
   create-contract-requested
   calculate-contract-values
   calculate-indebtedness
+  calculate-schedule
   update-contract-requested
 )
 
