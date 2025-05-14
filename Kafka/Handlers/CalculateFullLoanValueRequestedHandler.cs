@@ -38,7 +38,7 @@ public class CalculateFullLoanValueRequestedHandler : IEventHandler<CalculateFul
             var operation = new OperationEntity
             {
                 OperationId = innerEvent.OperationId,
-                Description = "Создание черновика контракта",
+                Description = "Расчет ПСК",
                 Status = OperationStatus.Started,
                 ContextJson = JsonConvert.SerializeObject(request),
                 StartedAt = DateTime.UtcNow

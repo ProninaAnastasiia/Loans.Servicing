@@ -3,22 +3,22 @@ using Loans.Servicing.Data.Dto;
 using Loans.Servicing.Data.Enums;
 using Loans.Servicing.Data.Models;
 using Loans.Servicing.Data.Repositories;
-using Loans.Servicing.Kafka.Events.CalculateRepaymentSchedule;
+using Loans.Servicing.Kafka.Events.CalculateContractValues;
 using Loans.Servicing.Kafka.Events.InnerEvents;
 using Newtonsoft.Json;
 
 namespace Loans.Servicing.Kafka.Handlers;
 
-public class CalculateScheduleRequestedHandler : IEventHandler<CalculateScheduleRequested>
+public class CalculateAllValuesRequestedHandler : IEventHandler<CalculateAllValuesRequested>
 {
     private readonly IConfiguration _config;
-    private readonly ILogger<CalculateScheduleRequestedHandler> _logger;
+    private readonly ILogger<CalculateAllValuesRequestedHandler> _logger;
     private readonly KafkaProducerService _producer;
     private readonly IMapper _mapper;
     private readonly IOperationRepository _operationRepository;
     private readonly IEventsRepository _eventsRepository;
     
-    public CalculateScheduleRequestedHandler(IMapper mapper, ILogger<CalculateScheduleRequestedHandler> logger, IConfiguration config, KafkaProducerService producer, IOperationRepository operationRepository, IEventsRepository eventsRepository)
+    public CalculateAllValuesRequestedHandler(IMapper mapper, ILogger<CalculateAllValuesRequestedHandler> logger, IConfiguration config, KafkaProducerService producer, IOperationRepository operationRepository, IEventsRepository eventsRepository)
     {
         _mapper = mapper;
         _logger = logger;
@@ -28,25 +28,25 @@ public class CalculateScheduleRequestedHandler : IEventHandler<CalculateSchedule
         _eventsRepository = eventsRepository;
     }
 
-    public async Task HandleAsync(CalculateScheduleRequested innerEvent, CancellationToken cancellationToken)
+    public async Task HandleAsync(CalculateAllValuesRequested innerEvent, CancellationToken cancellationToken)
     {
         try
         {
             await _eventsRepository.SaveAsync(innerEvent, innerEvent.OperationId, innerEvent.OperationId, cancellationToken);
-            var request = _mapper.Map<CalculateScheduleRequest>(innerEvent);
+            var request = _mapper.Map<CalculateAllContractValuesRequest>(innerEvent);
             var operation = new OperationEntity
             {
                 OperationId = innerEvent.OperationId,
-                Description = "Расчет графика погашения",
+                Description = "Расчет всех необходимых контракту значений",
                 Status = OperationStatus.Started,
                 ContextJson = JsonConvert.SerializeObject(request),
                 StartedAt = DateTime.UtcNow
             };
             await _operationRepository.SaveAsync(operation);
-            var @event = _mapper.Map<CalculateRepaymentScheduleEvent>(request, opt => opt.Items["OperationId"] = innerEvent.OperationId);
-
+            var @event = _mapper.Map<CalculateContractValuesEvent>(request, opt => opt.Items["OperationId"] = innerEvent.OperationId);
+            //var @event = new CalculateContractValuesEvent(request.ContractId, request.LoanAmount, request.LoanTermMonths, request.InterestRate, request.PaymentType, request.OperationId)
             var jsonMessage = JsonConvert.SerializeObject(@event);
-            var topic = _config["Kafka:Topics:CalculateSchedule"];
+            var topic = _config["Kafka:Topics:CalculateAllContractValues"];
     
             await _producer.PublishAsync(topic, jsonMessage);
     
@@ -54,7 +54,7 @@ public class CalculateScheduleRequestedHandler : IEventHandler<CalculateSchedule
         }
         catch (Exception e)
         {
-            _logger.LogError("Failed to handle CalculateScheduleRequested. ContractId: {ContractId}, OperationId: {OperationId}. Exception: {e}", innerEvent.ContractId , innerEvent.OperationId, e.Message);
+            _logger.LogError("Failed to handle CalculateAllValuesRequested. ContractId: {ContractId}, OperationId: {OperationId}. Exception: {e}", innerEvent.ContractId , innerEvent.OperationId, e.Message);
         }
     }
 }

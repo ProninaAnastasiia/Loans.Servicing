@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using Loans.Servicing.Data.Dto;
+using Loans.Servicing.Kafka.Events.CalculateAllContractValues;
 using Loans.Servicing.Kafka.Events.CalculateContractValues;
 using Loans.Servicing.Kafka.Events.CalculateFullLoanValue;
 using Loans.Servicing.Kafka.Events.CalculateRepaymentSchedule;
@@ -27,8 +28,13 @@ public class MappingProfile : Profile
             .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveFullLoanValueOperationId));
         CreateMap<CalculateFullLoanValueRequest, CalculateFullLoanValueEvent>()
             .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveFullLoanValueOperationId));
-        
+        CreateMap<CalculateAllContractValuesRequest, CalculateAllValuesRequested>()
+            .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveAllValuesOperationId));
+        CreateMap<CalculateAllContractValuesRequest, CalculateContractValuesEvent>()
+            .ForCtorParam("OperationId", opt => opt.MapFrom(ResolveAllValuesOperationId));
+
         CreateMap<CalculateScheduleRequested, CalculateScheduleRequest>(); 
+        CreateMap<CalculateAllValuesRequested, CalculateAllContractValuesRequest>(); 
         CreateMap<CalculateFullLoanValueRequested, CalculateFullLoanValueRequest>(); 
         
         CreateMap<LoanApplicationRecieved, LoanApplicationRequest>()
@@ -60,6 +66,11 @@ public class MappingProfile : Profile
     }
     
     private Guid ResolveFullLoanValueOperationId(CalculateFullLoanValueRequest src, ResolutionContext context)
+    {
+        return (Guid)context.Items["OperationId"];
+    }
+    
+    private Guid ResolveAllValuesOperationId(CalculateAllContractValuesRequest src, ResolutionContext context)
     {
         return (Guid)context.Items["OperationId"];
     }

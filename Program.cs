@@ -8,6 +8,7 @@ using Loans.Servicing.Data.Mappers;
 using Loans.Servicing.Data.Repositories;
 using Loans.Servicing.Kafka;
 using Loans.Servicing.Kafka.Consumers;
+using Loans.Servicing.Kafka.Events.CalculateAllContractValues;
 using Loans.Servicing.Kafka.Events.CalculateContractValues;
 using Loans.Servicing.Kafka.Events.CalculateFullLoanValue;
 using Loans.Servicing.Kafka.Events.CreateDraftContract;
@@ -40,6 +41,8 @@ builder.Services.AddScoped<IEventHandler<ContractDetailsResponseEvent>, Contract
 builder.Services.AddScoped<IEventHandler<ContractSentToClientEvent>, ContractSentToClientHandler>();
 builder.Services.AddScoped<IEventHandler<CalculateScheduleRequested>, CalculateScheduleRequestedHandler>();
 builder.Services.AddScoped<IEventHandler<CalculateFullLoanValueRequested>, CalculateFullLoanValueRequestedHandler>();
+builder.Services.AddScoped<IEventHandler<AllValuesCalculatedEvent>, AllValuesCalculatedHandler>();
+builder.Services.AddScoped<IEventHandler<CalculateAllValuesRequested>, CalculateAllValuesRequestedHandler>();
 
 builder.Services.AddScoped<IDelayedTaskScheduler, DelayedTaskScheduler>();
 builder.Services.AddScoped(typeof(HangfireHandlerExecutor<>));
@@ -49,6 +52,7 @@ builder.Services.AddHostedService<UpdateContractConsumer>();
 builder.Services.AddHostedService<CalculateContractValuesConsumer>();
 builder.Services.AddHostedService<CalculateScheduleConsumer>();
 builder.Services.AddHostedService<CalculateFullLoanValueConsumer>();
+builder.Services.AddHostedService<CalculateAllContractValuesConsumer>();
 
 builder.Services.AddSingleton<KafkaProducerService>();
 builder.Services.AddSingleton<IHandlerDispatcher, HangfireHandlerDispatcher>();
@@ -105,6 +109,15 @@ app.MapPost("/api/calculate-full-loan-value", async ([FromBody] CalculateFullLoa
     var @event = mapper.Map<CalculateFullLoanValueRequested>(request, opt => opt.Items["OperationId"] = operationId);
     var jsonMessage = JsonConvert.SerializeObject(@event);
     var topic = config["Kafka:Topics:CalculateIndebtedness"];
+    await producer.PublishAsync(topic, jsonMessage);
+});
+
+app.MapPost("/api/calculate-all-contract-values", async ([FromBody] CalculateAllContractValuesRequest request, KafkaProducerService producer, IConfiguration config, IMapper mapper) =>
+{
+    var operationId = Guid.NewGuid();
+    var @event = mapper.Map<CalculateAllValuesRequested>(request, opt => opt.Items["OperationId"] = operationId);
+    var jsonMessage = JsonConvert.SerializeObject(@event);
+    var topic = config["Kafka:Topics:CalculateAllContractValues"];
     await producer.PublishAsync(topic, jsonMessage);
 });
 
